@@ -3,7 +3,7 @@ const mqtt = require('mqtt')
 var jexl = require('jexl')
 var Redis = require('redis')
 
-const config = require('./homeautomation-js-lib/config_loading.js')
+const rules = require('./homeautomation-js-lib/rules.js')
 const logging = require('./homeautomation-js-lib/logging.js')
 
 require('./homeautomation-js-lib/devices.js')
@@ -22,7 +22,7 @@ const host = process.env.MQTT_HOST
 
 // Set up modules
 logging.set_enabled(true)
-logging.setRemoteHost(syslogHost, syslogPort)
+    // logging.setRemoteHost(syslogHost, syslogPort)
 
 // Setup MQTT
 var client = mqtt.connect(host)
@@ -39,8 +39,56 @@ client.on('disconnect', () => {
     client.connect(host)
 })
 
+function update_topic_for_expression(topic) {
+    topic = topic.replace(/\//g, '________')
+    return topic
+}
+
 client.on('message', (topic, message) => {
     logging.log(' ' + topic + ':' + message)
+
+    redis.keys('*', function(err, result) {
+        const keys = result.sort()
+        redis.mget(keys, function(err, values) {
+            var context = {}
+
+            for (var index = 0; index < keys.length; index++) {
+                var key = keys[index]
+                var value = values[index]
+                context[update_topic_for_expression(key)] = value
+            }
+
+            rules.ruleIterator(function(rule_name, rule) {
+                logging.log('rule_name:' + rule_name)
+                const watch = rule.watch
+                const rules = rule.rules
+                const actions = rule.actions
+
+                const observedDevices = watch.devices
+                logging.log('   watch: ' + JSON.stringify(watch))
+                logging.log('   rules: ' + JSON.stringify(rules))
+                logging.log(' actions: ' + JSON.stringify(actions))
+
+                if (observedDevices.indexOf(topic) !== -1) {
+                    logging.log('   *** hit')
+                    var expression = update_topic_for_expression(rules.expression)
+                    logging.log('          expression: ' + expression)
+
+                    jexl.eval(expression, context, function(err, res) {
+                        logging.log(res)
+                        if (res === true) {
+                            logging.log('go!')
+                            Object.keys(actions).forEach(function(topic) {
+                                client.publish(topic, actions[topic])
+                            }, this)
+
+                        }
+                    })
+                }
+
+            })
+        })
+    })
 })
 
 const redis = Redis.createClient({
@@ -73,28 +121,9 @@ redis.on('error', function(err) {
 
 redis.on('connect', function() {
     logging.log('redis connected')
-    config.load_path(config_path)
+    rules.load_path(config_path)
 })
 
-config.on('config-loaded', () => {
-    logging.log('config-loaded!')
-    redis.flushdb()
-
-    config.deviceIterator(function(device_id, device) {
-        redis.set(device.topic, device.name)
-    })
-})
-
-var context = {
-    name: { first: 'Sterling', last: 'Archer' },
-    assoc: [
-        { first: 'Lana', last: 'Kane' },
-        { first: 'Cyril', last: 'Figgis' },
-        { first: 'Pam', last: 'Poovey' }
-    ],
-    age: 36
-}
-
-jexl.eval('(1 || 0) * 4', context, function(err, res) {
-    logging.log(res) // Output: 72
+rules.on('rules-loaded', () => {
+    logging.log('rules-loaded!')
 })
