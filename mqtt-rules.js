@@ -44,10 +44,6 @@ function update_topic_for_expression(topic) {
     return topic
 }
 
-function update_value(value) {
-    return value
-}
-
 function evalulateValue(in_expression, in_context, in_name, in_topic, in_message, in_actions) {
     var jexl = new Jexl.Jexl()
     jexl.eval(in_expression, in_context, function(error, in_res) {
@@ -71,9 +67,9 @@ client.on('message', (topic, message) => {
                 const value = values[index]
                 const newKey = update_topic_for_expression(key)
                 if (key === topic)
-                    context[newKey] = update_value(message)
+                    context[newKey] = message
                 else
-                    context[newKey] = update_value(value)
+                    context[newKey] = value
             }
 
             rules.ruleIterator(function(rule_name, rule) {
@@ -86,7 +82,7 @@ client.on('message', (topic, message) => {
                         context,
                         rule_name,
                         update_topic_for_expression(topic),
-                        update_value(message),
+                        message,
                         actions)
                 }
             })
