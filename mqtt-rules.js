@@ -77,7 +77,6 @@ client.on('message', (topic, message) => {
             }
 
             rules.ruleIterator(function(rule_name, rule) {
-                logging.log('rule_name:' + rule_name)
                 const watch = rule.watch
                 const rules = rule.rules
                 const actions = rule.actions
