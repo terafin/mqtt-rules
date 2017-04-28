@@ -1,18 +1,18 @@
 // Requirements
-mqtt = require('mqtt')
+const mqtt = require('mqtt')
 
-logging = require('./homeautomation-js-lib/logging.js')
-mqtt_helpers = require('./homeautomation-js-lib/mqtt_helpers.js')
+const logging = require('./homeautomation-js-lib/logging.js')
+const mqtt_helpers = require('./homeautomation-js-lib/mqtt_helpers.js')
 
 
 // Config
-host = process.env.MQTT_HOST
+const host = process.env.MQTT_HOST
 
 // Set up modules
-logging.set_enabled(fatruelse)
+const logging.set_enabled(true)
 
 // Setup MQTT
-client = mqtt.connect(host)
+var client = mqtt.connect(host)
 
 // MQTT Observation
 
