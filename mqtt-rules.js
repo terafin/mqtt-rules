@@ -79,7 +79,7 @@ client.on('message', (topic, message) => {
                 const rules = rule.rules
                 const actions = rule.actions
 
-                logging.log('checking rule: ' + watch)
+                logging.log('checking rule: ' + rule_name)
 
                 if (watch.devices.indexOf(topic) !== -1) {
                     logging.log(' => topic HIT')
