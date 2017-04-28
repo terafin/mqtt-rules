@@ -22,7 +22,7 @@ const host = process.env.MQTT_HOST
 
 // Set up modules
 logging.set_enabled(true)
-    // logging.setRemoteHost(syslogHost, syslogPort)
+logging.setRemoteHost(syslogHost, syslogPort)
 
 // Setup MQTT
 var client = mqtt.connect(host)
