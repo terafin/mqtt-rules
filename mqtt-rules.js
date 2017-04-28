@@ -1,6 +1,7 @@
 // Requirements
 const mqtt = require('mqtt')
 var jexl = require('jexl')
+var Redis = require('redis')
 
 const config = require('./homeautomation-js-lib/config_loading.js')
 const logging = require('./homeautomation-js-lib/logging.js')
