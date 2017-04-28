@@ -47,8 +47,10 @@ function update_topic_for_expression(topic) {
 function evalulateValue(in_expression, in_context, in_name, in_topic, in_message, in_actions) {
     var jexl = new Jexl.Jexl()
     jexl.eval(in_expression, in_context, function(error, in_res) {
+        logging.log('evaluated expression: ' + in_expression + '   result: ' + in_res)
         if (in_res === true) {
             Object.keys(in_actions).forEach(function(resultTopic) {
+                logging.log('publishing: ' + resultTopic + '  value: ' + in_actions[resultTopic])
                 client.publish(resultTopic, in_actions[resultTopic])
             }, this)
         }
@@ -77,13 +79,18 @@ client.on('message', (topic, message) => {
                 const rules = rule.rules
                 const actions = rule.actions
 
+                logging.log('checking rule: ' + watch)
+
                 if (watch.devices.indexOf(topic) !== -1) {
+                    logging.log(' => topic HIT')
                     evalulateValue(update_topic_for_expression(rules.expression),
                         context,
                         rule_name,
                         update_topic_for_expression(topic),
                         message,
                         actions)
+                } else {
+                    logging.log(' => topic miss')
                 }
             })
         })
