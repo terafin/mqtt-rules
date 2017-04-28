@@ -1,7 +1,7 @@
 // Requirements
 const mqtt = require('mqtt')
-var jexl = require('jexl')
 var Redis = require('redis')
+var Jexl = require('jexl')
 
 const rules = require('./homeautomation-js-lib/rules.js')
 const logging = require('./homeautomation-js-lib/logging.js')
@@ -44,6 +44,20 @@ function update_topic_for_expression(topic) {
     return topic
 }
 
+function update_value(value) {
+    return value
+}
+
+function evalulateValue(in_expression, in_context, in_name, in_topic, in_message, in_actions) {
+    var jexl = new Jexl.Jexl()
+    jexl.eval(in_expression, in_context, function(error, in_res) {
+        if (in_res === true) {
+            Object.keys(in_actions).forEach(function(resultTopic) {
+                client.publish(resultTopic, in_actions[resultTopic])
+            }, this)
+        }
+    })
+}
 client.on('message', (topic, message) => {
     logging.log(' ' + topic + ':' + message)
 
@@ -53,9 +67,13 @@ client.on('message', (topic, message) => {
             var context = {}
 
             for (var index = 0; index < keys.length; index++) {
-                var key = keys[index]
-                var value = values[index]
-                context[update_topic_for_expression(key)] = value
+                const key = keys[index]
+                const value = values[index]
+                const newKey = update_topic_for_expression(key)
+                if (key === topic)
+                    context[newKey] = update_value(message)
+                else
+                    context[newKey] = update_value(value)
             }
 
             rules.ruleIterator(function(rule_name, rule) {
@@ -64,28 +82,14 @@ client.on('message', (topic, message) => {
                 const rules = rule.rules
                 const actions = rule.actions
 
-                const observedDevices = watch.devices
-                logging.log('   watch: ' + JSON.stringify(watch))
-                logging.log('   rules: ' + JSON.stringify(rules))
-                logging.log(' actions: ' + JSON.stringify(actions))
-
-                if (observedDevices.indexOf(topic) !== -1) {
-                    logging.log('   *** hit')
-                    var expression = update_topic_for_expression(rules.expression)
-                    logging.log('          expression: ' + expression)
-
-                    jexl.eval(expression, context, function(err, res) {
-                        logging.log(res)
-                        if (res === true) {
-                            logging.log('go!')
-                            Object.keys(actions).forEach(function(topic) {
-                                client.publish(topic, actions[topic])
-                            }, this)
-
-                        }
-                    })
+                if (watch.devices.indexOf(topic) !== -1) {
+                    evalulateValue(update_topic_for_expression(rules.expression),
+                        context,
+                        rule_name,
+                        update_topic_for_expression(topic),
+                        update_value(message),
+                        actions)
                 }
-
             })
         })
     })
