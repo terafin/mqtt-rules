@@ -56,6 +56,7 @@ function evalulateValue(in_expression, in_context, in_name, in_topic, in_message
         }
     })
 }
+
 client.on('message', (topic, message) => {
     logging.log(' ' + topic + ':' + message)
 
@@ -73,6 +74,8 @@ client.on('message', (topic, message) => {
                 else
                     context[newKey] = value
             }
+
+            context[update_topic_for_expression(topic)] = message
 
             rules.ruleIterator(function(rule_name, rule) {
                 const watch = rule.watch
