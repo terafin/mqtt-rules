@@ -82,18 +82,15 @@ client.on('message', (topic, message) => {
                 const rules = rule.rules
                 const actions = rule.actions
 
-                logging.log('checking rule: ' + rule_name)
-
                 if (watch.devices.indexOf(topic) !== -1) {
-                    logging.log(' => topic HIT')
+                    logging.log('checking hit: ' + rule_name)
+
                     evalulateValue(update_topic_for_expression(rules.expression),
                         context,
                         rule_name,
                         update_topic_for_expression(topic),
                         message,
                         actions)
-                } else {
-                    logging.log(' => topic miss')
                 }
             })
         })
