@@ -11,6 +11,7 @@
         "start": "node mqtt-rules.js"
     },
     "dependencies": {
+        "pushover-notifications": "^0.2.4",
         "js-yaml": "^3.8.3",
         "jexl": "^1.1.4",
         "syslog": "^0.1.1",

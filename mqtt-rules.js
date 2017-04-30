@@ -5,6 +5,7 @@ var Jexl = require('jexl')
 
 const rules = require('./homeautomation-js-lib/rules.js')
 const logging = require('./homeautomation-js-lib/logging.js')
+const pushover = require('pushover-notifications')
 
 require('./homeautomation-js-lib/devices.js')
 require('./homeautomation-js-lib/mqtt_helpers.js')
@@ -44,15 +45,45 @@ function update_topic_for_expression(topic) {
     return topic
 }
 
-function evalulateValue(in_expression, in_context, in_name, in_topic, in_message, in_actions) {
+function evalulateValue(expression, context, name, topic, message, actions, notify) {
     var jexl = new Jexl.Jexl()
-    jexl.eval(in_expression, in_context, function(error, in_res) {
-        logging.log('evaluated expression: ' + in_expression + '   result: ' + in_res)
-        if (in_res === true) {
-            Object.keys(in_actions).forEach(function(resultTopic) {
-                logging.log('publishing: ' + resultTopic + '  value: ' + in_actions[resultTopic])
-                client.publish(resultTopic, in_actions[resultTopic])
+    jexl.eval(expression, context, function(error, res) {
+        logging.log('evaluated expression: ' + expression + '   result: ' + res)
+        if (res === true) {
+            Object.keys(actions).forEach(function(resultTopic) {
+                logging.log('publishing: ' + resultTopic + '  value: ' + actions[resultTopic])
+                client.publish(resultTopic, actions[resultTopic])
             }, this)
+
+            if (notify !== null && notify !== undefined) {
+                const baseAppToken = process.env.PUSHOVER_APP_TOKEN
+                const baseUserToken = process.env.PUSHOVER_USER_TOKEN
+
+                logging.log('notify: ' + JSON.stringify(notify))
+                var p = new pushover({
+                    user: (notify.user ? notify.user : baseUserToken),
+                    token: (notify.token ? notify.token : baseAppToken)
+                })
+
+                var msg = {
+                    // These values correspond to the parameters detailed on https://pushover.net/api
+                    // 'message' is required. All other values are optional.
+                    message: notify.message,
+                    title: notify.title,
+                    sound: notify.sound,
+                    device: notify.device,
+                    priority: notify.priority,
+                    url: notify.url,
+                    url_title: notify.url_title,
+                }
+
+                p.send(msg, function(err, result) {
+                    logging.log('notify error: ' + err)
+                    logging.log('notify result: ' + result)
+                })
+
+
+            }
         }
     })
 }
@@ -81,6 +112,7 @@ client.on('message', (topic, message) => {
                 const watch = rule.watch
                 const rules = rule.rules
                 const actions = rule.actions
+                const notify = rule.notify
 
                 if (watch.devices.indexOf(topic) !== -1) {
                     logging.log('checking hit: ' + rule_name)
@@ -90,7 +122,8 @@ client.on('message', (topic, message) => {
                         rule_name,
                         update_topic_for_expression(topic),
                         message,
-                        actions)
+                        actions,
+                        notify)
                 }
             })
         })
