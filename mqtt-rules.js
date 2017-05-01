@@ -118,7 +118,7 @@ function evaluateProcessor(job, doneEvaluate) {
             const notify = rule.notify
             var perform_after = rule.perform_after
             if (perform_after === undefined || perform_after === null) {
-                perform_after = 0.001
+                perform_after = 0
             }
             const queueName = name + '_action'
             var actionQueue = actionQueues[queueName]
@@ -196,6 +196,8 @@ function evalulateValue(in_context, name, topic, value, rule) {
     })
 }
 
+var global_value_cache = {}
+
 client.on('message', (topic, message) => {
     //logging.log(' ' + topic + ':' + message)
 
@@ -221,6 +223,20 @@ client.on('message', (topic, message) => {
 
                 if (watch.devices.indexOf(topic) !== -1) {
                     logging.log('found watch: ' + rule_name)
+                    var cachedValues = global_value_cache[rule_name]
+                    if (cachedValues === null || cachedValues === undefined) {
+                        cachedValues = {}
+                    }
+                    var cachedValue = cachedValues[topic]
+
+                    if (cachedValue !== null && cachedValue !== undefined) {
+                        if (('' + message).localeCompare(cachedValue) === 0) {
+                            logging.log(' => value not updated')
+                            return
+                        }
+                    }
+                    cachedValues[topic] = message
+                    global_value_cache[rule_name] = cachedValues
 
                     evalulateValue(
                         context,
@@ -228,6 +244,7 @@ client.on('message', (topic, message) => {
                         update_topic_for_expression(topic),
                         message,
                         rule)
+
                 }
             })
         })
