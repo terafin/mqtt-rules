@@ -6,6 +6,7 @@ var Jexl = require('jexl')
 const rules = require('./homeautomation-js-lib/rules.js')
 const logging = require('./homeautomation-js-lib/logging.js')
 const pushover = require('pushover-notifications')
+const Queue = require('bull')
 
 require('./homeautomation-js-lib/devices.js')
 require('./homeautomation-js-lib/mqtt_helpers.js')
@@ -45,46 +46,157 @@ function update_topic_for_expression(topic) {
     return topic
 }
 
-function evalulateValue(expression, context, name, topic, message, actions, notify) {
-    var jexl = new Jexl.Jexl()
-    jexl.eval(expression, context, function(error, res) {
-        logging.log('evaluated expression: ' + expression + '   result: ' + res)
-        if (res === true) {
-            Object.keys(actions).forEach(function(resultTopic) {
-                logging.log('publishing: ' + resultTopic + '  value: ' + actions[resultTopic])
-                client.publish(resultTopic, actions[resultTopic])
-            }, this)
+var actionQueues = {}
+var evalQueues = {}
 
-            if (notify !== null && notify !== undefined) {
-                const baseAppToken = process.env.PUSHOVER_APP_TOKEN
-                const baseUserToken = process.env.PUSHOVER_USER_TOKEN
+function jobProcessor(job, doneAction) {
+    const actions = job.data.actions
+    const notify = job.data.notify
+    const name = job.data.name
+    const message = job.data.message
+    const topic = job.data.topic
+    const expression = job.data.expression
 
-                logging.log('notify: ' + JSON.stringify(notify))
-                var p = new pushover({
-                    user: (notify.user ? notify.user : baseUserToken),
-                    token: (notify.token ? notify.token : baseAppToken)
-                })
+    logging.log('action queue: ' + name + '    begin')
+    Object.keys(actions).forEach(function(resultTopic) {
+        logging.log('publishing: ' + resultTopic + '  value: ' + actions[resultTopic])
+        client.publish(resultTopic, actions[resultTopic])
+    }, this)
 
-                var msg = {
-                    // These values correspond to the parameters detailed on https://pushover.net/api
-                    // 'message' is required. All other values are optional.
-                    message: notify.message,
-                    title: notify.title,
-                    sound: notify.sound,
-                    device: notify.device,
-                    priority: notify.priority,
-                    url: notify.url,
-                    url_title: notify.url_title,
-                }
+    if (notify !== null && notify !== undefined) {
+        const baseAppToken = process.env.PUSHOVER_APP_TOKEN
+        const baseUserToken = process.env.PUSHOVER_USER_TOKEN
 
-                p.send(msg, function(err, result) {
-                    logging.log('notify error: ' + err)
-                    logging.log('notify result: ' + result)
-                })
+        logging.log('****** notify: ' + JSON.stringify(notify))
+        var p = new pushover({
+            user: (notify.user ? notify.user : baseUserToken),
+            token: (notify.token ? notify.token : baseAppToken)
+        })
 
-
-            }
+        var msg = {
+            // These values correspond to the parameters detailed on https://pushover.net/api
+            // 'message' is required. All other values are optional.
+            message: notify.message,
+            title: notify.title,
+            sound: notify.sound,
+            device: notify.device,
+            priority: notify.priority,
+            url: notify.url,
+            url_title: notify.url_title,
         }
+
+        p.send(msg, function(err, result) {
+            logging.log('notify error: ' + err)
+            logging.log('notify result: ' + result)
+        })
+
+        logging.log('action queue: ' + name + '    end')
+        doneAction()
+    }
+}
+
+function evaluateProcessor(job, doneEvaluate) {
+    const name = job.data.name
+    const value = job.data.value
+    const context = job.data.context
+    const topic = job.data.topic
+    const rule = job.data.rule
+
+    logging.log('eval queue: ' + name + '    begin' + '    value: ' + JSON.stringify(value))
+    logging.log('rule: ' + JSON.stringify(rule))
+    const expression = update_topic_for_expression(rule.rules.expression)
+    var jexl = new Jexl.Jexl()
+
+    jexl.eval(expression, context, function(error, result) {
+        logging.log('(' + name + ') evaluated expression: ' + expression + '   result: ' + result + '   error: ' + error)
+        if (result === true) {
+            const actions = rule.actions
+            const notify = rule.notify
+            var perform_after = rule.perform_after
+            if (perform_after === undefined || perform_after === null) {
+                perform_after = 0.001
+            }
+            const queueName = name + '_action'
+            var actionQueue = actionQueues[queueName]
+            if (actionQueue !== null && actionQueue !== undefined) {
+                logging.log('removed existing action queue: ' + queueName)
+                actionQueue.empty()
+            }
+
+            actionQueue = Queue(queueName, redisPort, redisHost)
+            actionQueues[queueName] = actionQueue
+            logging.log('created queue: ' + queueName + '   queue: ' + actionQueue)
+            logging.log('perform_after: ' + perform_after)
+
+            actionQueue.process(jobProcessor)
+
+            actionQueue.add({
+                name: name,
+                notify: notify,
+                actions: actions,
+                value: value,
+                topic: topic,
+                expression: expression
+            }, {
+                removeOnComplete: true,
+                removeOnFail: true,
+                delay: (perform_after * 1000), // milliseconds
+            })
+        }
+        logging.log('eval queue: ' + name + '    end')
+
+        doneEvaluate()
+    })
+
+}
+
+function evalulateValue(context, name, topic, value, rule) {
+    if (true === true) {
+        var data = {
+            rule: rule,
+            name: name,
+            value: '' + value,
+            context: context,
+            topic: topic,
+        }
+        var job = {
+            data: data
+        }
+        evaluateProcessor(job, function() {
+
+        })
+        return
+    }
+
+    var evalQueue = evalQueues[name]
+    if (evalQueue !== null && evalQueue !== undefined) {
+        logging.log('removed existing evaluate queue: ' + name)
+        evalQueue.empty()
+    }
+    const actionQueueName = name + '_action'
+    var actionQueue = actionQueues[actionQueueName]
+    if (actionQueue !== null && actionQueue !== undefined) {
+        logging.log('removed existing action queue: ' + actionQueueName)
+        actionQueue.empty()
+    }
+
+    const evaluateAfter = rule.evaluate_after
+    logging.log('evaluateAfter: ' + evaluateAfter)
+    evalQueue = Queue(name, redisPort, redisHost)
+    evalQueues[name] = evalQueue
+
+    evalQueue.process(evaluateProcessor)
+
+    evalQueue.add({
+        rule: rule,
+        name: name,
+        value: '' + value,
+        context: context,
+        topic: topic,
+    }, {
+        removeOnComplete: true,
+        removeOnFail: true,
+        delay: (evaluateAfter * 1000), // milliseconds
     })
 }
 
@@ -110,20 +222,16 @@ client.on('message', (topic, message) => {
 
             rules.ruleIterator(function(rule_name, rule) {
                 const watch = rule.watch
-                const rules = rule.rules
-                const actions = rule.actions
-                const notify = rule.notify
 
                 if (watch.devices.indexOf(topic) !== -1) {
                     logging.log('checking hit: ' + rule_name)
 
-                    evalulateValue(update_topic_for_expression(rules.expression),
+                    evalulateValue(
                         context,
                         rule_name,
                         update_topic_for_expression(topic),
                         message,
-                        actions,
-                        notify)
+                        rule)
                 }
             })
         })
