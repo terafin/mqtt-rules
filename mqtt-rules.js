@@ -47,7 +47,6 @@ function update_topic_for_expression(topic) {
 }
 
 var actionQueues = {}
-var evalQueues = {}
 
 function jobProcessor(job, doneAction) {
     const actions = job.data.actions
@@ -94,6 +93,8 @@ function jobProcessor(job, doneAction) {
         doneAction()
     }
 }
+
+var evalQueues = {}
 
 function evaluateProcessor(job, doneEvaluate) {
     const name = job.data.name
@@ -151,7 +152,7 @@ function evaluateProcessor(job, doneEvaluate) {
 }
 
 function evalulateValue(context, name, topic, value, rule) {
-    if (true === true) {
+    if (true) {
         var data = {
             rule: rule,
             name: name,
@@ -180,7 +181,8 @@ function evalulateValue(context, name, topic, value, rule) {
         actionQueue.empty()
     }
 
-    const evaluateAfter = rule.evaluate_after
+    var evaluateAfter = rule.evaluate_after
+
     logging.log('evaluateAfter: ' + evaluateAfter)
     evalQueue = Queue(name, redisPort, redisHost)
     evalQueues[name] = evalQueue
