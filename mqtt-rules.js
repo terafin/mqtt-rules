@@ -7,9 +7,14 @@ const rules = require('./homeautomation-js-lib/rules.js')
 const logging = require('./homeautomation-js-lib/logging.js')
 const pushover = require('pushover-notifications')
 const Queue = require('bull')
+const schedule = require('node-schedule')
+const SolarCalc = require('solar-calc')
 
 require('./homeautomation-js-lib/devices.js')
 require('./homeautomation-js-lib/mqtt_helpers.js')
+
+const solarLat = process.env.LOCATION_LAT
+const solarLong = process.env.LOCATION_LONG
 
 const redisHost = process.env.REDIS_HOST
 const redisPort = process.env.REDIS_PORT
@@ -102,12 +107,10 @@ var evalQueues = {}
 
 function evaluateProcessor(job, doneEvaluate) {
     const name = job.data.name
-    const value = job.data.value
     const context = job.data.context_value
-    const topic = job.data.topic
     const rule = job.data.rule
 
-    logging.log('eval queue: ' + name + '    begin' + '    value: ' + JSON.stringify(value))
+    logging.log('eval queue: ' + name + '    begin')
 
     const expression = update_topic_for_expression(rule.rules.expression)
     var jexl = new Jexl.Jexl()
@@ -137,8 +140,6 @@ function evaluateProcessor(job, doneEvaluate) {
                 name: name,
                 notify: notify,
                 actions: actions,
-                value: value,
-                topic: topic,
                 expression: expression
             }, {
                 removeOnComplete: true,
@@ -153,7 +154,7 @@ function evaluateProcessor(job, doneEvaluate) {
 
 }
 
-function evalulateValue(in_context, name, topic, value, rule) {
+function evalulateValue(in_context, name, rule) {
 
     const queueName = name + '_eval'
     var evalQueue = evalQueues[queueName]
@@ -181,9 +182,7 @@ function evalulateValue(in_context, name, topic, value, rule) {
     var job = {
         rule: rule,
         name: '' + name,
-        value: '' + value,
-        context_value: {},
-        topic: '' + topic,
+        context_value: {}
     }
 
     Object.keys(in_context).forEach(function(key) {
@@ -242,8 +241,6 @@ client.on('message', (topic, message) => {
                     evalulateValue(
                         context,
                         rule_name,
-                        update_topic_for_expression(topic),
-                        message,
                         rule)
 
                 }
@@ -287,4 +284,71 @@ redis.on('connect', function() {
 
 rules.on('rules-loaded', () => {
     logging.log('rules-loaded!')
+    scheduleJobs()
 })
+
+
+var scheduled_jobs = []
+
+function doSchedule(rule_name, jobName, cronSchedule, rule) {
+    var newJob = schedule.scheduleJob(cronSchedule, function(rule_value) {
+        logging.log(' rule: ' + rule_value)
+
+        redis.keys('*', function(err, result) {
+            const keys = result.sort()
+            redis.mget(keys, function(err, values) {
+                var context = {}
+
+                for (var index = 0; index < keys.length; index++) {
+                    const key = keys[index]
+                    const value = values[index]
+                    const newKey = update_topic_for_expression(key)
+                    context[newKey] = value
+                }
+
+                logging.log('matching rule: ' + rule_name)
+
+                evalulateValue(
+                    context,
+                    rule_name,
+                    rule)
+            })
+        })
+    }.bind(null, rule))
+
+    if (newJob !== null && newJob !== undefined) {
+        logging.log(' scheduled: ' + cronSchedule)
+        scheduled_jobs.push(newJob)
+    }
+}
+
+function scheduleJobs() {
+    scheduled_jobs.forEach(function(job) {
+        job.cancel()
+    }, this)
+
+    rules.ruleIterator(function(rule_name, rule) {
+        const schedule = rule.schedule
+        const daily = rule.daily
+
+        if (schedule !== null && schedule !== undefined) {
+            Object.keys(schedule).forEach(function(schedule_key) {
+                var jobKey = rule_name + '.schedule.' + schedule_key
+                const cronSchedule = schedule[schedule_key]
+                logging.log(jobKey + ' = ' + cronSchedule)
+                doSchedule(rule_name, jobKey, cronSchedule, rule)
+            }, this)
+        }
+
+        if (daily !== null && daily !== undefined) {
+            Object.keys(daily).forEach(function(daily_key) {
+                var jobKey = rule_name + '.daily.' + daily_key
+                var offset = daily[daily_key].offset
+                if (offset === null || offset === undefined)
+                    offset = 0
+
+                logging.log(jobKey + ' offset: ' + offset)
+            }, this)
+        }
+    })
+}

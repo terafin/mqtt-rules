@@ -12,6 +12,8 @@
     },
     "dependencies": {
         "bull": "2.2.6",
+        "solar-calc": "^1.1.0",
+        "node-schedule": "^1.2.1",
         "pushover-notifications": "^0.2.4",
         "js-yaml": "^3.8.3",
         "jexl": "^1.1.4",
