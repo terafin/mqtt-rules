@@ -382,8 +382,6 @@ function scheduleJobs() {
                 logging.log(jobKey + ' offset: ' + offset)
                 if (date !== null) {
                     var newDate = moment(date).add(offset, 'minutes')
-                    logging.log('date: ' + date)
-                    logging.log('newDate: ' + newDate)
                     doSchedule(rule_name, jobKey, newDate.toDate(), rule)
                 }
 
