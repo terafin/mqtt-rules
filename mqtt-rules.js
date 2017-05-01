@@ -52,9 +52,9 @@ function jobProcessor(job, doneAction) {
     const actions = job.data.actions
     const notify = job.data.notify
     const name = job.data.name
-    const message = job.data.message
-    const topic = job.data.topic
-    const expression = job.data.expression
+        // const message = job.data.message
+        // const topic = job.data.topic
+        // const expression = job.data.expression
 
     logging.log('action queue: ' + name + '    begin')
     Object.keys(actions).forEach(function(resultTopic) {
@@ -66,7 +66,6 @@ function jobProcessor(job, doneAction) {
         const baseAppToken = process.env.PUSHOVER_APP_TOKEN
         const baseUserToken = process.env.PUSHOVER_USER_TOKEN
 
-        logging.log('****** notify: ' + JSON.stringify(notify))
         var p = new pushover({
             user: (notify.user ? notify.user : baseUserToken),
             token: (notify.token ? notify.token : baseAppToken)
@@ -85,8 +84,12 @@ function jobProcessor(job, doneAction) {
         }
 
         p.send(msg, function(err, result) {
-            logging.log('notify error: ' + err)
-            logging.log('notify result: ' + result)
+            if (err !== null && err !== undefined) {
+                logging.log('notify error: ' + err)
+                logging.log('result: ' + err)
+            } else {
+                logging.log(' => Successfully notified')
+            }
         })
 
         logging.log('action queue: ' + name + '    end')
@@ -99,17 +102,17 @@ var evalQueues = {}
 function evaluateProcessor(job, doneEvaluate) {
     const name = job.data.name
     const value = job.data.value
-    const context = job.data.context
+    const context = job.data.context_value
     const topic = job.data.topic
     const rule = job.data.rule
 
     logging.log('eval queue: ' + name + '    begin' + '    value: ' + JSON.stringify(value))
-    logging.log('rule: ' + JSON.stringify(rule))
+
     const expression = update_topic_for_expression(rule.rules.expression)
     var jexl = new Jexl.Jexl()
 
     jexl.eval(expression, context, function(error, result) {
-        logging.log('(' + name + ') evaluated expression: ' + expression + '   result: ' + result + '   error: ' + error)
+        logging.log('  =>(' + name + ') evaluated expression: ' + expression + '   result: ' + result + '   error: ' + error)
         if (result === true) {
             const actions = rule.actions
             const notify = rule.notify
@@ -126,8 +129,6 @@ function evaluateProcessor(job, doneEvaluate) {
 
             actionQueue = Queue(queueName, redisPort, redisHost)
             actionQueues[queueName] = actionQueue
-            logging.log('created queue: ' + queueName + '   queue: ' + actionQueue)
-            logging.log('perform_after: ' + perform_after)
 
             actionQueue.process(jobProcessor)
 
@@ -151,53 +152,44 @@ function evaluateProcessor(job, doneEvaluate) {
 
 }
 
-function evalulateValue(context, name, topic, value, rule) {
-    if (true) {
-        var data = {
-            rule: rule,
-            name: name,
-            value: '' + value,
-            context: context,
-            topic: topic,
-        }
-        var job = {
-            data: data
-        }
-        evaluateProcessor(job, function() {
-
-        })
-        return
-    }
+function evalulateValue(in_context, name, topic, value, rule) {
 
     const queueName = name + '_eval'
     var evalQueue = evalQueues[queueName]
+
     if (evalQueue !== null && evalQueue !== undefined) {
-        logging.log('removed existing evaluate queue: ' + queueName)
         evalQueue.empty()
     }
 
     const actionQueueName = name + '_action'
     var actionQueue = actionQueues[actionQueueName]
     if (actionQueue !== null && actionQueue !== undefined) {
-        logging.log('removed existing action queue: ' + actionQueueName)
         actionQueue.empty()
     }
 
     var evaluateAfter = rule.evaluate_after
+    if (evaluateAfter === undefined || evaluateAfter === null) {
+        evaluateAfter = 0
+    }
 
-    logging.log('evaluateAfter: ' + evaluateAfter)
     evalQueue = Queue(queueName, redisPort, redisHost)
     evalQueues[queueName] = evalQueue
 
     evalQueue.process(evaluateProcessor)
 
-    evalQueue.add({
+    var job = {
         rule: rule,
-        name: name,
+        name: '' + name,
         value: '' + value,
-        context: context,
-        topic: topic,
-    }, {
+        context_value: {},
+        topic: '' + topic,
+    }
+
+    Object.keys(in_context).forEach(function(key) {
+        job.context_value[key] = '' + in_context[key]
+    }, this)
+
+    evalQueue.add(job, {
         removeOnComplete: true,
         removeOnFail: true,
         delay: (evaluateAfter * 1000), // milliseconds
@@ -205,7 +197,7 @@ function evalulateValue(context, name, topic, value, rule) {
 }
 
 client.on('message', (topic, message) => {
-    logging.log(' ' + topic + ':' + message)
+    //logging.log(' ' + topic + ':' + message)
 
     redis.keys('*', function(err, result) {
         const keys = result.sort()
@@ -228,7 +220,7 @@ client.on('message', (topic, message) => {
                 const watch = rule.watch
 
                 if (watch.devices.indexOf(topic) !== -1) {
-                    logging.log('checking hit: ' + rule_name)
+                    logging.log('found watch: ' + rule_name)
 
                     evalulateValue(
                         context,
