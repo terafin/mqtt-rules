@@ -57,10 +57,12 @@ function jobProcessor(job, doneAction) {
         // const expression = job.data.expression
 
     logging.log('action queue: ' + name + '    begin')
-    Object.keys(actions).forEach(function(resultTopic) {
-        logging.log('publishing: ' + resultTopic + '  value: ' + actions[resultTopic])
-        client.publish(resultTopic, actions[resultTopic])
-    }, this)
+    if (actions !== null && actions !== undefined) {
+        Object.keys(actions).forEach(function(resultTopic) {
+            logging.log('publishing: ' + resultTopic + '  value: ' + actions[resultTopic])
+            client.publish(resultTopic, actions[resultTopic])
+        }, this)
+    }
 
     if (notify !== null && notify !== undefined) {
         const baseAppToken = process.env.PUSHOVER_APP_TOKEN
@@ -86,15 +88,14 @@ function jobProcessor(job, doneAction) {
         p.send(msg, function(err, result) {
             if (err !== null && err !== undefined) {
                 logging.log('notify error: ' + err)
-                logging.log('result: ' + err)
+                logging.log('result: ' + result)
             } else {
                 logging.log(' => Successfully notified')
             }
         })
-
-        logging.log('action queue: ' + name + '    end')
-        doneAction()
     }
+    logging.log('action queue: ' + name + '    end')
+    doneAction()
 }
 
 var evalQueues = {}
