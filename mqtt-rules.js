@@ -152,28 +152,13 @@ function evaluateProcessor(job, doneEvaluate) {
 }
 
 function evalulateValue(context, name, topic, value, rule) {
-    if (true) {
-        var data = {
-            rule: rule,
-            name: name,
-            value: '' + value,
-            context: context,
-            topic: topic,
-        }
-        var job = {
-            data: data
-        }
-        evaluateProcessor(job, function() {
-
-        })
-        return
-    }
-
-    var evalQueue = evalQueues[name]
+    const queueName = name + '_eval'
+    var evalQueue = evalQueues[queueName]
     if (evalQueue !== null && evalQueue !== undefined) {
-        logging.log('removed existing evaluate queue: ' + name)
+        logging.log('removed existing evaluate queue: ' + queueName)
         evalQueue.empty()
     }
+
     const actionQueueName = name + '_action'
     var actionQueue = actionQueues[actionQueueName]
     if (actionQueue !== null && actionQueue !== undefined) {
@@ -184,8 +169,8 @@ function evalulateValue(context, name, topic, value, rule) {
     var evaluateAfter = rule.evaluate_after
 
     logging.log('evaluateAfter: ' + evaluateAfter)
-    evalQueue = Queue(name, redisPort, redisHost)
-    evalQueues[name] = evalQueue
+    evalQueue = Queue(queueName, redisPort, redisHost)
+    evalQueues[queueName] = evalQueue
 
     evalQueue.process(evaluateProcessor)
 
