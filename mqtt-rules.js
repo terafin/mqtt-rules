@@ -152,6 +152,23 @@ function evaluateProcessor(job, doneEvaluate) {
 }
 
 function evalulateValue(context, name, topic, value, rule) {
+    if (true) {
+        var data = {
+            rule: rule,
+            name: name,
+            value: '' + value,
+            context: context,
+            topic: topic,
+        }
+        var job = {
+            data: data
+        }
+        evaluateProcessor(job, function() {
+
+        })
+        return
+    }
+
     const queueName = name + '_eval'
     var evalQueue = evalQueues[queueName]
     if (evalQueue !== null && evalQueue !== undefined) {
