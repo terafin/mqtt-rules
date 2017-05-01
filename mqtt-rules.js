@@ -9,6 +9,7 @@ const pushover = require('pushover-notifications')
 const Queue = require('bull')
 const schedule = require('node-schedule')
 const SolarCalc = require('solar-calc')
+const moment = require('moment')
 
 require('./homeautomation-js-lib/devices.js')
 require('./homeautomation-js-lib/mqtt_helpers.js')
@@ -323,6 +324,8 @@ function doSchedule(rule_name, jobName, cronSchedule, rule) {
 }
 
 function scheduleJobs() {
+    scheduleDailyJobs()
+
     scheduled_jobs.forEach(function(job) {
         job.cancel()
     }, this)
@@ -341,14 +344,64 @@ function scheduleJobs() {
         }
 
         if (daily !== null && daily !== undefined) {
+
             Object.keys(daily).forEach(function(daily_key) {
+                var solar = new SolarCalc(new Date(), Number(solarLat), Number(solarLong))
                 var jobKey = rule_name + '.daily.' + daily_key
-                var offset = daily[daily_key].offset
-                if (offset === null || offset === undefined)
-                    offset = 0
+                const dailyValue = daily[daily_key]
+                var offset = 0
+                if (dailyValue !== null && dailyValue !== undefined) {
+                    if (dailyValue.offset === null || dailyValue.offset === undefined)
+                        offset = 0
+                    else
+                        offset = Number(dailyValue.offset)
+                }
+
+                var date = null
+
+                if (daily_key === 'sunrise')
+                    date = solar.sunrise
+                else if (daily_key === 'sunset')
+                    date = solar.sunset
+                else if (daily_key === 'civilDawn')
+                    date = solar.civilDawn
+                else if (daily_key === 'nauticalDawn')
+                    date = solar.nauticalDawn
+                else if (daily_key === 'astronomicalDawn')
+                    date = solar.astronomicalDawn
+                else if (daily_key === 'civilDusk')
+                    date = solar.civilDusk
+                else if (daily_key === 'nauticalDusk')
+                    date = solar.nauticalDusk
+                else if (daily_key === 'astronomicalDusk')
+                    date = solar.astronomicalDusk
+                else if (daily_key === 'solarNoon')
+                    date = solar.solarNoon
+
 
                 logging.log(jobKey + ' offset: ' + offset)
+                if (date !== null) {
+                    var newDate = moment(date).add(offset, 'minutes')
+                    logging.log('date: ' + date)
+                    logging.log('newDate: ' + newDate)
+                    doSchedule(rule_name, jobKey, newDate.toDate(), rule)
+                }
+
             }, this)
         }
+    })
+}
+
+var dailyJob = null
+
+function scheduleDailyJobs() {
+    if (dailyJob !== null)
+        return
+
+    logging.log('Scheduling Daily Job')
+
+    dailyJob = schedule.scheduleJob('00 00 * * * ', function() {
+        logging.log('** Daily Job **')
+        scheduleJobs()
     })
 }
