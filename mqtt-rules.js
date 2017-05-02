@@ -110,9 +110,45 @@ function evaluateProcessor(job, doneEvaluate) {
     const name = job.data.name
     const context = job.data.context_value
     const rule = job.data.rule
+    const allowed_times = rule.allowed_times
+
+    var isOKTime = true
 
     logging.log('eval queue: ' + name + '    begin')
 
+    if (allowed_times !== null && allowed_times !== undefined) {
+        isOKTime = false
+
+        allowed_times.forEach(function(timeRange) {
+            const split = timeRange.split('-')
+            logging.log(' time range from: ' + split[0] + '   to: ' + split[1])
+
+            const startDate = moment(new Date())
+            const endDate = moment(new Date())
+
+            const startHours = split[0].split(':')[0]
+            const startMinutes = split[0].split(':')[1]
+
+            const endHours = split[1].split(':')[0]
+            const endMinutes = split[1].split(':')[1]
+
+            startDate.hours(Number(startHours))
+            startDate.minutes(Number(startMinutes))
+            endDate.hours(Number(endHours))
+            endDate.minutes(Number(endMinutes))
+
+            const result = moment(new Date()).isBetween(startDate, endDate)
+            if (result == true) {
+                isOKTime = true
+            }
+        }, this)
+    }
+
+    if (!isOKTime) {
+        logging.log('eval queue: ' + name + '    end - not a good time')
+        doneEvaluate()
+        return
+    }
     const expression = update_topic_for_expression(rule.rules.expression)
     var jexl = new Jexl.Jexl()
 
