@@ -49,6 +49,7 @@ client.on('disconnect', () => {
 
 function update_topic_for_expression(topic) {
     topic = topic.replace(/\//g, '________')
+    topic = topic.replace(/-/g, '_')
     return topic
 }
 
@@ -153,6 +154,7 @@ function evaluateProcessor(job, doneEvaluate) {
     var jexl = new Jexl.Jexl()
 
     jexl.eval(expression, context, function(error, result) {
+
         logging.log('  =>(' + name + ') evaluated expression: ' + expression + '   result: ' + result + '   error: ' + error)
         if (result === true) {
             const actions = rule.actions
@@ -185,10 +187,8 @@ function evaluateProcessor(job, doneEvaluate) {
             })
         }
         logging.log('eval queue: ' + name + '    end')
-
         doneEvaluate()
     })
-
 }
 
 function evalulateValue(in_context, name, rule) {
@@ -275,10 +275,7 @@ client.on('message', (topic, message) => {
                     cachedValues[topic] = message
                     global_value_cache[rule_name] = cachedValues
 
-                    evalulateValue(
-                        context,
-                        rule_name,
-                        rule)
+                    evalulateValue(context, rule_name, rule)
 
                 }
             })
