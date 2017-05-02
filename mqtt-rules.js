@@ -257,8 +257,11 @@ client.on('message', (topic, message) => {
 
             rules.ruleIterator(function(rule_name, rule) {
                 const watch = rule.watch
+                const devices = watch.devices
+                if (devices == null || devices == undefined)
+                    return
 
-                if (watch.devices.indexOf(topic) !== -1) {
+                if (devices.indexOf(topic) !== -1) {
                     logging.log('found watch: ' + rule_name)
                     var cachedValues = global_value_cache[rule_name]
                     if (cachedValues === null || cachedValues === undefined) {
