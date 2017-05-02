@@ -436,7 +436,7 @@ function scheduleDailyJobs() {
 
     logging.log('Scheduling Daily Job')
 
-    dailyJob = schedule.scheduleJob('00 00 * * * ', function() {
+    dailyJob = schedule.scheduleJob('00 00 00 * * * ', function() {
         logging.log('** Daily Job **')
         scheduleJobs()
     })
