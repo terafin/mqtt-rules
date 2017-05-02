@@ -257,6 +257,8 @@ client.on('message', (topic, message) => {
 
             rules.ruleIterator(function(rule_name, rule) {
                 const watch = rule.watch
+                if (watch == null || watch == undefined)
+                    return
                 const devices = watch.devices
                 if (devices == null || devices == undefined)
                     return
