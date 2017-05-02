@@ -59,6 +59,7 @@ function jobProcessor(job, doneAction) {
     const actions = job.data.actions
     const notify = job.data.notify
     const name = job.data.name
+    const context = job.data.context
         // const message = job.data.message
         // const topic = job.data.topic
         // const expression = job.data.expression
@@ -66,8 +67,16 @@ function jobProcessor(job, doneAction) {
     logging.log('action queue: ' + name + '    begin')
     if (actions !== null && actions !== undefined) {
         Object.keys(actions).forEach(function(resultTopic) {
-            logging.log('publishing: ' + resultTopic + '  value: ' + actions[resultTopic])
-            client.publish(resultTopic, actions[resultTopic])
+            const publishValue = actions[resultTopic]
+            logging.log('evaluating for publish: ' + resultTopic + '  value: ' + publishValue)
+
+            const publishExpression = update_topic_for_expression(publishValue)
+            var jexl = new Jexl.Jexl()
+
+            jexl.eval(publishExpression, context, function(error, publishResult) {
+                logging.log('  =>(' + name + ') evaluated expression: ' + publishExpression + '   result: ' + publishResult + '   error: ' + error)
+                client.publish(resultTopic, '' + publishResult)
+            })
         }, this)
     }
 
@@ -181,7 +190,8 @@ function evaluateProcessor(job, doneEvaluate) {
                     name: name,
                     notify: notify,
                     actions: actions,
-                    expression: expression
+                    expression: expression,
+                    context: context
                 }, {
                     removeOnComplete: true,
                     removeOnFail: true,
