@@ -150,45 +150,51 @@ function evaluateProcessor(job, doneEvaluate) {
         doneEvaluate()
         return
     }
-    const expression = update_topic_for_expression(rule.rules.expression)
-    var jexl = new Jexl.Jexl()
 
-    jexl.eval(expression, context, function(error, result) {
+    if (rule.rules !== null && rule.rules !== undefined) {
+        const expression = update_topic_for_expression(rule.rules.expression)
+        var jexl = new Jexl.Jexl()
 
-        logging.log('  =>(' + name + ') evaluated expression: ' + expression + '   result: ' + result + '   error: ' + error)
-        if (result === true) {
-            const actions = rule.actions
-            const notify = rule.notify
-            var perform_after = rule.perform_after
-            if (perform_after === undefined || perform_after === null) {
-                perform_after = 0
+        jexl.eval(expression, context, function(error, result) {
+
+            logging.log('  =>(' + name + ') evaluated expression: ' + expression + '   result: ' + result + '   error: ' + error)
+            if (result === true) {
+                const actions = rule.actions
+                const notify = rule.notify
+                var perform_after = rule.perform_after
+                if (perform_after === undefined || perform_after === null) {
+                    perform_after = 0
+                }
+                const queueName = name + '_action'
+                var actionQueue = actionQueues[queueName]
+                if (actionQueue !== null && actionQueue !== undefined) {
+                    logging.log('removed existing action queue: ' + queueName)
+                    actionQueue.empty()
+                }
+
+                actionQueue = Queue(queueName, redisPort, redisHost)
+                actionQueues[queueName] = actionQueue
+
+                actionQueue.process(jobProcessor)
+
+                actionQueue.add({
+                    name: name,
+                    notify: notify,
+                    actions: actions,
+                    expression: expression
+                }, {
+                    removeOnComplete: true,
+                    removeOnFail: true,
+                    delay: (perform_after * 1000), // milliseconds
+                })
             }
-            const queueName = name + '_action'
-            var actionQueue = actionQueues[queueName]
-            if (actionQueue !== null && actionQueue !== undefined) {
-                logging.log('removed existing action queue: ' + queueName)
-                actionQueue.empty()
-            }
-
-            actionQueue = Queue(queueName, redisPort, redisHost)
-            actionQueues[queueName] = actionQueue
-
-            actionQueue.process(jobProcessor)
-
-            actionQueue.add({
-                name: name,
-                notify: notify,
-                actions: actions,
-                expression: expression
-            }, {
-                removeOnComplete: true,
-                removeOnFail: true,
-                delay: (perform_after * 1000), // milliseconds
-            })
-        }
-        logging.log('eval queue: ' + name + '    end')
+            logging.log('eval queue: ' + name + '    end expression')
+            doneEvaluate()
+        })
+    } else {
+        logging.log('eval queue: ' + name + '    end - no expression')
         doneEvaluate()
-    })
+    }
 }
 
 function evalulateValue(in_context, name, rule) {
