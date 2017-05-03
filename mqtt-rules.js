@@ -53,6 +53,10 @@ function update_topic_for_expression(topic) {
     return topic
 }
 
+function isValueAnExpression(value) {
+    return (value.includes('/') || value.includes('?') || value.includes('+'))
+}
+
 var actionQueues = {}
 
 function jobProcessor(job, doneAction) {
@@ -70,7 +74,7 @@ function jobProcessor(job, doneAction) {
             const publishValue = actions[resultTopic]
             logging.log('evaluating for publish: ' + resultTopic + '  value: ' + publishValue)
 
-            if (publishValue.includes('/') || publishValue.includes('?') || publishValue.includes('+')) {
+            if (isValueAnExpression(publishValue)) {
                 const publishExpression = update_topic_for_expression(publishValue)
                 var jexl = new Jexl.Jexl()
 
@@ -289,20 +293,23 @@ client.on('message', (topic, message) => {
 
                 if (devices.indexOf(topic) !== -1) {
                     logging.log('found watch: ' + rule_name)
-                    var cachedValues = global_value_cache[rule_name]
-                    if (cachedValues === null || cachedValues === undefined) {
-                        cachedValues = {}
-                    }
-                    var cachedValue = cachedValues[topic]
-
-                    if (cachedValue !== null && cachedValue !== undefined) {
-                        if (('' + message).localeCompare(cachedValue) === 0) {
-                            logging.log(' => value not updated')
-                                //return
+                    const isExpression = (!isValueAnExpression('' + message))
+                    if (!isExpression) {
+                        var cachedValues = global_value_cache[rule_name]
+                        if (cachedValues === null || cachedValues === undefined) {
+                            cachedValues = {}
                         }
+                        var cachedValue = cachedValues[topic]
+
+                        if (cachedValue !== null && cachedValue !== undefined) {
+                            if (('' + message).localeCompare(cachedValue) === 0) {
+                                logging.log(' => value not updated')
+                                return
+                            }
+                        }
+                        cachedValues[topic] = message
+                        global_value_cache[rule_name] = cachedValues
                     }
-                    cachedValues[topic] = message
-                    global_value_cache[rule_name] = cachedValues
 
                     evalulateValue(context, rule_name, rule)
 
