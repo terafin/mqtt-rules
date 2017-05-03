@@ -193,16 +193,23 @@ function evaluateProcessor(job, doneEvaluate) {
         }
     }
 
-    if (rule.rules !== null && rule.rules !== undefined) {
-        const expression = update_topic_for_expression(rule.rules.expression)
-        var jexl = new Jexl.Jexl()
+    if (rule.rules !== null && rule.rules !== undefined && rule.rules.expression !== undefined) {
+        if (rule.rules.expression.includes('/')) {
 
-        jexl.eval(expression, context, function(error, result) {
-            logging.log('  =>(' + name + ') evaluated expression: ' + expression + '   result: ' + result + '   error: ' + error)
+            const expression = update_topic_for_expression(rule.rules.expression)
+            var jexl = new Jexl.Jexl()
+
+            jexl.eval(expression, context, function(error, result) {
+                logging.log('  =>(' + name + ') evaluated expression: ' + expression + '   result: ' + result + '   error: ' + error)
+                performAction(result, context, name, rule)
+                logging.log('eval queue: ' + name + '    end expression')
+                doneEvaluate()
+            })
+        } else {
             performAction(result, context, name, rule)
             logging.log('eval queue: ' + name + '    end expression')
-            doneEvaluate()
-        })
+            doneEvaluate
+        }
     } else {
         performAction(true, context, name, rule)
         logging.log('eval queue: ' + name + '    end expression - skip rule')
