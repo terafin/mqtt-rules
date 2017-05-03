@@ -292,7 +292,7 @@ client.on('message', (topic, message) => {
                     if (cachedValue !== null && cachedValue !== undefined) {
                         if (('' + message).localeCompare(cachedValue) === 0) {
                             logging.log(' => value not updated')
-                            return
+                                //return
                         }
                     }
                     cachedValues[topic] = message
