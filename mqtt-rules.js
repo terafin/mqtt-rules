@@ -191,9 +191,6 @@ function evaluateProcessor(job, doneEvaluate) {
                 delay: (perform_after * 1000), // milliseconds
             })
         }
-        logging.log('eval queue: ' + name + '    end expression')
-        doneEvaluate()
-
     }
 
     if (rule.rules !== null && rule.rules !== undefined) {
@@ -203,9 +200,13 @@ function evaluateProcessor(job, doneEvaluate) {
         jexl.eval(expression, context, function(error, result) {
             logging.log('  =>(' + name + ') evaluated expression: ' + expression + '   result: ' + result + '   error: ' + error)
             performAction(result, context, name, rule)
+            logging.log('eval queue: ' + name + '    end expression')
+            doneEvaluate()
         })
     } else {
         performAction(true, context, name, rule)
+        logging.log('eval queue: ' + name + '    end expression - skip rule')
+        doneEvaluate()
     }
 }
 
