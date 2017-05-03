@@ -70,13 +70,18 @@ function jobProcessor(job, doneAction) {
             const publishValue = actions[resultTopic]
             logging.log('evaluating for publish: ' + resultTopic + '  value: ' + publishValue)
 
-            const publishExpression = update_topic_for_expression(publishValue)
-            var jexl = new Jexl.Jexl()
+            if (publishValue.includes('/') || publishValue.includes('?') || publishValue.includes('+')) {
+                const publishExpression = update_topic_for_expression(publishValue)
+                var jexl = new Jexl.Jexl()
 
-            jexl.eval(publishExpression, context, function(error, publishResult) {
-                logging.log('  =>(' + name + ') evaluated expression: ' + publishExpression + '   result: ' + publishResult + '   error: ' + error)
-                client.publish(resultTopic, '' + publishResult)
-            })
+                jexl.eval(publishExpression, context, function(error, publishResult) {
+                    logging.log('  =>(' + name + ') evaluated expression: ' + publishExpression + '   result: ' + publishResult + '   error: ' + error)
+                    client.publish(resultTopic, '' + publishResult)
+                })
+
+            } else {
+                client.publish(resultTopic, '' + publishValue)
+            }
         }, this)
     }
 
@@ -194,26 +199,19 @@ function evaluateProcessor(job, doneEvaluate) {
     }
 
     if (rule.rules !== null && rule.rules !== undefined && rule.rules.expression !== undefined) {
-        if (rule.rules.expression.includes('/')) {
+        const expression = update_topic_for_expression(rule.rules.expression)
+        var jexl = new Jexl.Jexl()
 
-            const expression = update_topic_for_expression(rule.rules.expression)
-            var jexl = new Jexl.Jexl()
-
-            jexl.eval(expression, context, function(error, result) {
-                logging.log('  =>(' + name + ') evaluated expression: ' + expression + '   result: ' + result + '   error: ' + error)
-                performAction(result, context, name, rule)
-                logging.log('eval queue: ' + name + '    end expression')
-                doneEvaluate()
-            })
-        } else {
-            performAction(true, context, name, rule)
-            logging.log('eval queue: ' + name + '    end expression - no /')
-            doneEvaluate
-        }
+        jexl.eval(expression, context, function(error, result) {
+            logging.log('  =>(' + name + ') evaluated expression: ' + expression + '   result: ' + result + '   error: ' + error)
+            performAction(result, context, name, rule)
+            logging.log('eval queue: ' + name + '    end expression')
+            doneEvaluate()
+        })
     } else {
         performAction(true, context, name, rule)
-        logging.log('eval queue: ' + name + '    end expression - skip rule')
-        doneEvaluate()
+        logging.log('eval queue: ' + name + '    end expression - no /')
+        doneEvaluate
     }
 }
 
