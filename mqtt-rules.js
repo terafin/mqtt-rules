@@ -207,7 +207,7 @@ function evaluateProcessor(job, doneEvaluate) {
             })
         } else {
             performAction(true, context, name, rule)
-            logging.log('eval queue: ' + name + '    end expression')
+            logging.log('eval queue: ' + name + '    end expression - no /')
             doneEvaluate
         }
     } else {
