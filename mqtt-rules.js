@@ -265,6 +265,15 @@ var global_value_cache = {}
 
 client.on('message', (topic, message) => {
     //logging.log(' ' + topic + ':' + message)
+    var cachedValue = global_value_cache[topic]
+
+    if (cachedValue !== null && cachedValue !== undefined) {
+        if (('' + message).localeCompare(cachedValue) === 0) {
+            logging.log(' => value not updated')
+            return
+        }
+    }
+    global_value_cache[topic] = message
 
     redis.keys('*', function(err, result) {
         const keys = result.sort()
@@ -293,26 +302,8 @@ client.on('message', (topic, message) => {
 
                 if (devices.indexOf(topic) !== -1) {
                     logging.log('found watch: ' + rule_name)
-                    const isExpression = (!isValueAnExpression('' + message))
-                    if (!isExpression) {
-                        var cachedValues = global_value_cache[rule_name]
-                        if (cachedValues === null || cachedValues === undefined) {
-                            cachedValues = {}
-                        }
-                        var cachedValue = cachedValues[topic]
-
-                        if (cachedValue !== null && cachedValue !== undefined) {
-                            if (('' + message).localeCompare(cachedValue) === 0) {
-                                logging.log(' => value not updated')
-                                return
-                            }
-                        }
-                        cachedValues[topic] = message
-                        global_value_cache[rule_name] = cachedValues
-                    }
 
                     evalulateValue(context, rule_name, rule)
-
                 }
             })
         })
