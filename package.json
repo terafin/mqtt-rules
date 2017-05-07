@@ -11,6 +11,8 @@
         "start": "node mqtt-rules.js"
     },
     "dependencies": {
+        "winston": "^2.3.1",
+        "winston-logstash": "^0.3.0",
         "bull": "2.2.6",
         "moment": "^2.18.1",
         "solar-calc": "^1.1.0",
@@ -18,7 +20,6 @@
         "pushover-notifications": "^0.2.4",
         "js-yaml": "^3.8.3",
         "jexl": "^1.1.4",
-        "syslog": "^0.1.1",
         "watch": "^1.0.2",
         "redis": "^2.7.1",
         "request": "^2.81.0",
