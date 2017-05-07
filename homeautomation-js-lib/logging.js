@@ -1,39 +1,34 @@
-const Syslog = require('syslog')
-var syslog = null
+var Winston = require('winston')
+require('winston-logstash')
 
-var enable_logging = false
+var winston = new(Winston.Logger)({
+    transports: [
+        new(Winston.transports.Console)({ level: 'debug' })
+    ]
+})
 
-exports.setRemoteHost = function(remoteHost, remotePort) {
-    syslog = Syslog.createClient(remotePort, remoteHost)
+
+const logstashHost = process.env.LOGSTASH_HOST
+const logstashPort = process.env.LOGSTASH_PORT
+var name = process.env.name
+
+if (name === null || name === undefined) {
+    name = process.env.LOGGING_NAME
 }
 
-exports.log = function(someString) {
-    if (enable_logging) console.log(someString)
-
-    if (syslog !== null)
-        syslog.info(someString)
+if (name === null || name === undefined) {
+    name = 'winston'
 }
 
-exports.info = function(someValue) {
-    var string = null
+winston.info('Logging enabled for ' + name + '   (logstash sending to: ' + logstashHost + ':' + logstashPort + ')')
 
-    if ((typeof someValue) === typeof('')) {
-        string = someValue
-    } else {
-        string = JSON.stringify(someValue)
-    }
+module.exports = winston
 
-    if (syslog !== null)
-        syslog.info(string)
-}
+if (logstashHost !== undefined && logstashHost !== null) {
+    winston.add(Winston.transports.Logstash, {
+        port: logstashPort,
+        node_name: name,
+        host: logstashHost
+    })
 
-exports.warn = function(someString) {
-    console.log(someString)
-    if (syslog !== null)
-        syslog.warn(someString)
-
-}
-
-exports.set_enabled = function(enabled) {
-    enable_logging = enabled
 }
