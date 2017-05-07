@@ -22,15 +22,8 @@ const redisPort = process.env.REDIS_PORT
 const redisDB = process.env.REDIS_DATABASE
 const config_path = process.env.TRANSFORM_CONFIG_PATH
 
-const syslogHost = process.env.SYSLOG_HOST
-const syslogPort = process.env.SYSLOG_PORT
-
 // Config
 const host = process.env.MQTT_HOST
-
-// Set up modules
-logging.set_enabled(true)
-logging.setRemoteHost(syslogHost, syslogPort)
 
 // Setup MQTT
 var client = mqtt.connect(host)
@@ -38,12 +31,12 @@ var client = mqtt.connect(host)
 // MQTT Observation
 
 client.on('connect', () => {
-    logging.log('Reconnecting...\n')
+    logging.info('Reconnecting...\n')
     client.subscribe('#')
 })
 
 client.on('disconnect', () => {
-    logging.log('Reconnecting...\n')
+    logging.info('Reconnecting...\n')
     client.connect(host)
 })
 
@@ -68,18 +61,18 @@ function jobProcessor(job, doneAction) {
         // const topic = job.data.topic
         // const expression = job.data.expression
 
-    logging.log('action queue: ' + name + '    begin')
+    logging.info('action queue: ' + name + '    begin')
     if (actions !== null && actions !== undefined) {
         Object.keys(actions).forEach(function(resultTopic) {
             const publishValue = actions[resultTopic]
-            logging.log('evaluating for publish: ' + resultTopic + '  value: ' + publishValue)
+            logging.info('evaluating for publish: ' + resultTopic + '  value: ' + publishValue)
 
             if (isValueAnExpression(publishValue)) {
                 const publishExpression = update_topic_for_expression(publishValue)
                 var jexl = new Jexl.Jexl()
 
                 jexl.eval(publishExpression, context, function(error, publishResult) {
-                    logging.log('  =>(' + name + ') evaluated expression: ' + publishExpression + '   result: ' + publishResult + '   error: ' + error)
+                    logging.info('  =>(' + name + ') evaluated expression: ' + publishExpression + '   result: ' + publishResult + '   error: ' + error)
                     client.publish(resultTopic, '' + publishResult)
                 })
 
@@ -112,14 +105,14 @@ function jobProcessor(job, doneAction) {
 
         p.send(msg, function(err, result) {
             if (err !== null && err !== undefined) {
-                logging.log('notify error: ' + err)
-                logging.log('result: ' + result)
+                logging.info('notify error: ' + err)
+                logging.info('result: ' + result)
             } else {
-                logging.log(' => Successfully notified')
+                logging.info(' => Successfully notified')
             }
         })
     }
-    logging.log('action queue: ' + name + '    end')
+    logging.info('action queue: ' + name + '    end')
     doneAction()
 }
 
@@ -133,14 +126,14 @@ function evaluateProcessor(job, doneEvaluate) {
 
     var isOKTime = true
 
-    logging.log('eval queue: ' + name + '    begin')
+    logging.info('eval queue: ' + name + '    begin')
 
     if (allowed_times !== null && allowed_times !== undefined) {
         isOKTime = false
 
         allowed_times.forEach(function(timeRange) {
             const split = timeRange.split('-')
-            logging.log(' time range from: ' + split[0] + '   to: ' + split[1])
+            logging.info(' time range from: ' + split[0] + '   to: ' + split[1])
 
             const startDate = moment(new Date())
             const endDate = moment(new Date())
@@ -164,7 +157,7 @@ function evaluateProcessor(job, doneEvaluate) {
     }
 
     if (!isOKTime) {
-        logging.log('eval queue: ' + name + '    end - not a good time')
+        logging.info('eval queue: ' + name + '    end - not a good time')
         doneEvaluate()
         return
     }
@@ -180,7 +173,7 @@ function evaluateProcessor(job, doneEvaluate) {
             const queueName = name + '_action'
             var actionQueue = actionQueues[queueName]
             if (actionQueue !== null && actionQueue !== undefined) {
-                logging.log('removed existing action queue: ' + queueName)
+                logging.info('removed existing action queue: ' + queueName)
                 actionQueue.empty()
             }
 
@@ -207,14 +200,14 @@ function evaluateProcessor(job, doneEvaluate) {
         var jexl = new Jexl.Jexl()
 
         jexl.eval(expression, context, function(error, result) {
-            logging.log('  =>(' + name + ') evaluated expression: ' + expression + '   result: ' + result + '   error: ' + error)
+            logging.info('  =>(' + name + ') evaluated expression: ' + expression + '   result: ' + result + '   error: ' + error)
             performAction(result, context, name, rule)
-            logging.log('eval queue: ' + name + '    end expression')
+            logging.info('eval queue: ' + name + '    end expression')
             doneEvaluate()
         })
     } else {
         performAction(true, context, name, rule)
-        logging.log('eval queue: ' + name + '    end expression - no /')
+        logging.info('eval queue: ' + name + '    end expression - no /')
         doneEvaluate
     }
 }
@@ -264,12 +257,12 @@ function evalulateValue(in_context, name, rule) {
 var global_value_cache = {}
 
 client.on('message', (topic, message) => {
-    //logging.log(' ' + topic + ':' + message)
+    //logging.info(' ' + topic + ':' + message)
     var cachedValue = global_value_cache[topic]
 
     if (cachedValue !== null && cachedValue !== undefined) {
         if (('' + message).localeCompare(cachedValue) === 0) {
-            logging.log(' => value not updated')
+            logging.info(' => value not updated')
             return
         }
     }
@@ -301,7 +294,7 @@ client.on('message', (topic, message) => {
                     return
 
                 if (devices.indexOf(topic) !== -1) {
-                    logging.log('found watch: ' + rule_name)
+                    logging.info('found watch: ' + rule_name)
 
                     evalulateValue(context, rule_name, rule)
                 }
@@ -335,16 +328,16 @@ const redis = Redis.createClient({
 // redis callbacks
 
 redis.on('error', function(err) {
-    logging.log('redis error ' + err)
+    logging.info('redis error ' + err)
 })
 
 redis.on('connect', function() {
-    logging.log('redis connected')
+    logging.info('redis connected')
     rules.load_path(config_path)
 })
 
 rules.on('rules-loaded', () => {
-    logging.log('rules-loaded!')
+    logging.info('rules-loaded!')
     scheduleJobs()
 })
 
@@ -353,7 +346,7 @@ var scheduled_jobs = []
 
 function doSchedule(rule_name, jobName, cronSchedule, rule) {
     var newJob = schedule.scheduleJob(cronSchedule, function(rule_value) {
-        logging.log(' rule: ' + rule_value)
+        logging.info(' rule: ' + rule_value)
 
         redis.keys('*', function(err, result) {
             const keys = result.sort()
@@ -367,7 +360,7 @@ function doSchedule(rule_name, jobName, cronSchedule, rule) {
                     context[newKey] = value
                 }
 
-                logging.log('matching rule: ' + rule_name)
+                logging.info('matching rule: ' + rule_name)
 
                 evalulateValue(
                     context,
@@ -378,7 +371,7 @@ function doSchedule(rule_name, jobName, cronSchedule, rule) {
     }.bind(null, rule))
 
     if (newJob !== null && newJob !== undefined) {
-        logging.log(' scheduled: ' + cronSchedule)
+        logging.info(' scheduled: ' + cronSchedule)
         scheduled_jobs.push(newJob)
     }
 }
@@ -398,7 +391,7 @@ function scheduleJobs() {
             Object.keys(schedule).forEach(function(schedule_key) {
                 var jobKey = rule_name + '.schedule.' + schedule_key
                 const cronSchedule = schedule[schedule_key]
-                logging.log(jobKey + ' = ' + cronSchedule)
+                logging.info(jobKey + ' = ' + cronSchedule)
                 doSchedule(rule_name, jobKey, cronSchedule, rule)
             }, this)
         }
@@ -439,7 +432,7 @@ function scheduleJobs() {
                     date = solar.solarNoon
 
 
-                logging.log(jobKey + ' offset: ' + offset)
+                logging.info(jobKey + ' offset: ' + offset)
                 if (date !== null) {
                     var newDate = moment(date).add(offset, 'minutes')
                     doSchedule(rule_name, jobKey, newDate.toDate(), rule)
@@ -456,10 +449,10 @@ function scheduleDailyJobs() {
     if (dailyJob !== null)
         return
 
-    logging.log('Scheduling Daily Job')
+    logging.info('Scheduling Daily Job')
 
     dailyJob = schedule.scheduleJob('00 00 00 * * * ', function() {
-        logging.log('** Daily Job **')
+        logging.info('** Daily Job **')
         scheduleJobs()
     })
 }
