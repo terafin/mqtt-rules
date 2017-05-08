@@ -31,12 +31,16 @@ var client = mqtt.connect(host)
 // MQTT Observation
 
 client.on('connect', () => {
-    logging.info('Reconnecting...\n')
+    logging.info('MQTT Connected', {
+        action: 'mqtt-connected'
+    })
     client.subscribe('#')
 })
 
 client.on('disconnect', () => {
-    logging.info('Reconnecting...\n')
+    logging.error('Disconnected', {
+        action: 'mqtt-disconnected'
+    })
     client.connect(host)
 })
 
@@ -61,22 +65,46 @@ function jobProcessor(job, doneAction) {
         // const topic = job.data.topic
         // const expression = job.data.expression
 
-    logging.info('action queue: ' + name + '    begin')
+    logging.debug('action queue: ' + name + '    begin')
     if (actions !== null && actions !== undefined) {
         Object.keys(actions).forEach(function(resultTopic) {
             const publishValue = actions[resultTopic]
-            logging.info('evaluating for publish: ' + resultTopic + '  value: ' + publishValue)
+            logging.debug('evaluating for publish: ' + resultTopic + '  value: ' + publishValue)
 
             if (isValueAnExpression(publishValue)) {
                 const publishExpression = update_topic_for_expression(publishValue)
                 var jexl = new Jexl.Jexl()
 
-                jexl.eval(publishExpression, context, function(error, publishResult) {
-                    logging.info('  =>(' + name + ') evaluated expression: ' + publishExpression + '   result: ' + publishResult + '   error: ' + error)
+                jexl.eval(publishExpression, context, function(publishError, publishResult) {
+                    logging.info('  done evaluating publish expression for =>(' + name + ')', {
+                        action: 'publish-expression-evaluation-done',
+                        rule_name: name,
+                        expression: publishExpression,
+                        result: publishResult,
+                        topic: resultTopic,
+                        error: publishError,
+                        value: publishValue
+                    })
+
                     client.publish(resultTopic, '' + publishResult)
+                    logging.info(' published result', {
+                        action: 'published-value',
+                        rule_name: name,
+                        expression: publishExpression,
+                        result: publishResult,
+                        topic: resultTopic,
+                        error: publishError,
+                        value: publishValue
+                    })
                 })
 
             } else {
+                logging.info(' published result', {
+                    action: 'published-value',
+                    rule_name: name,
+                    topic: resultTopic,
+                    value: publishValue
+                })
                 client.publish(resultTopic, '' + publishValue)
             }
         }, this)
@@ -104,15 +132,18 @@ function jobProcessor(job, doneAction) {
         }
 
         p.send(msg, function(err, result) {
+            var json = notify
+            json.action = 'notify'
+            json.rule_name = name
             if (err !== null && err !== undefined) {
-                logging.info('notify error: ' + err)
-                logging.info('result: ' + result)
+                json.error = err
+                logging.info(' failed notification', json)
             } else {
-                logging.info(' => Successfully notified')
+                logging.info(' successfully notified', json)
             }
         })
     }
-    logging.info('action queue: ' + name + '    end')
+    logging.debug('action queue: ' + name + '    end')
     doneAction()
 }
 
@@ -124,16 +155,23 @@ function evaluateProcessor(job, doneEvaluate) {
     const rule = job.data.rule
     const allowed_times = rule.allowed_times
 
+    var logResult = {
+        action: 'rule-time-evaluation',
+        rule_name: name,
+        rule: rule,
+        allowed_times: allowed_times,
+        context: context
+    }
     var isOKTime = true
 
-    logging.info('eval queue: ' + name + '    begin')
+    logging.debug('eval queue: ' + name + '    begin')
 
     if (allowed_times !== null && allowed_times !== undefined) {
         isOKTime = false
 
         allowed_times.forEach(function(timeRange) {
             const split = timeRange.split('-')
-            logging.info(' time range from: ' + split[0] + '   to: ' + split[1])
+            logging.debug(' time range from: ' + split[0] + '   to: ' + split[1])
 
             const startDate = moment(new Date())
             const endDate = moment(new Date())
@@ -157,7 +195,8 @@ function evaluateProcessor(job, doneEvaluate) {
     }
 
     if (!isOKTime) {
-        logging.info('eval queue: ' + name + '    end - not a good time')
+        logging.info('not evaluating, bad time =>(' + name + ')', logResult)
+        logging.debug('eval queue: ' + name + '    end - not a good time')
         doneEvaluate()
         return
     }
@@ -173,7 +212,11 @@ function evaluateProcessor(job, doneEvaluate) {
             const queueName = name + '_action'
             var actionQueue = actionQueues[queueName]
             if (actionQueue !== null && actionQueue !== undefined) {
-                logging.info('removed existing action queue: ' + queueName)
+
+                logging.info('cancelled existing action queue =>(' + queueName + ')', logResult + {
+                    queue_name: queueName
+                })
+
                 actionQueue.empty()
             }
 
@@ -182,8 +225,15 @@ function evaluateProcessor(job, doneEvaluate) {
 
             actionQueue.process(jobProcessor)
 
+            logging.info('enqueued action =>(' + queueName + ')', logResult + {
+                action: 'enqueued-action',
+                delay: perform_after,
+                actions: actions,
+                notify: notify,
+                queue_name: queueName
+            })
             actionQueue.add({
-                name: name,
+                rule_name: name,
                 notify: notify,
                 actions: actions,
                 context: context
@@ -200,15 +250,22 @@ function evaluateProcessor(job, doneEvaluate) {
         var jexl = new Jexl.Jexl()
 
         jexl.eval(expression, context, function(error, result) {
-            logging.info('  =>(' + name + ') evaluated expression: ' + expression + '   result: ' + result + '   error: ' + error)
+            logging.info('  =>(' + name + ') evaluated expression', logResult + {
+                action: 'evaluated-expression',
+                result: result,
+                error: error
+            })
             performAction(result, context, name, rule)
-            logging.info('eval queue: ' + name + '    end expression')
+            logging.debug('eval queue: ' + name + '    end expression')
             doneEvaluate()
         })
     } else {
+        logging.info('  =>(' + name + ') skipped evaluated expression', logResult + {
+            action: 'no-expression-to-evaluate'
+        })
         performAction(true, context, name, rule)
-        logging.info('eval queue: ' + name + '    end expression - no /')
-        doneEvaluate
+        logging.debug('eval queue: ' + name + '    end expression - no expression')
+        doneEvaluate()
     }
 }
 
@@ -247,6 +304,14 @@ function evalulateValue(in_context, name, rule) {
         job.context_value[key] = '' + in_context[key]
     }, this)
 
+    logging.info('enqueued expression evaluation =>(' + queueName + ')', {
+        action: 'enqueued-evaluation',
+        delay: evaluateAfter,
+        rule_name: name,
+        rule: rule,
+        queue_name: queueName
+    })
+
     evalQueue.add(job, {
         removeOnComplete: true,
         removeOnFail: true,
@@ -262,7 +327,12 @@ client.on('message', (topic, message) => {
 
     if (cachedValue !== null && cachedValue !== undefined) {
         if (('' + message).localeCompare(cachedValue) === 0) {
-            logging.info(' => value not updated')
+            logging.info(' => value not updated', {
+                action: 'skipped-processing',
+                reason: 'value-not-updated',
+                topic: topic,
+                message: message
+            })
             return
         }
     }
@@ -294,7 +364,14 @@ client.on('message', (topic, message) => {
                     return
 
                 if (devices.indexOf(topic) !== -1) {
-                    logging.info('found watch: ' + rule_name)
+                    logging.info('matched topic to rule', {
+                        action: 'rule-match',
+                        rule_name: rule_name,
+                        topic: topic,
+                        message: message,
+                        rule: rule,
+                        context: context
+                    })
 
                     evalulateValue(context, rule_name, rule)
                 }
@@ -328,16 +405,24 @@ const redis = Redis.createClient({
 // redis callbacks
 
 redis.on('error', function(err) {
-    logging.info('redis error ' + err)
+    logging.error('redis error ' + err, {
+        action: 'redis-error',
+        error: err
+    })
 })
 
 redis.on('connect', function() {
-    logging.info('redis connected')
+    logging.info('redis connected ', {
+        action: 'redis-connected'
+    })
+
     rules.load_path(config_path)
 })
 
 rules.on('rules-loaded', () => {
-    logging.info('rules-loaded!')
+    logging.info('rules loaded ', {
+        action: 'rules-loaded'
+    })
     scheduleJobs()
 })
 
@@ -346,7 +431,14 @@ var scheduled_jobs = []
 
 function doSchedule(rule_name, jobName, cronSchedule, rule) {
     var newJob = schedule.scheduleJob(cronSchedule, function(rule_value) {
-        logging.info(' rule: ' + rule_value)
+        logging.info('job fired ', {
+            action: 'scheduled-job-fired',
+            schedule: cronSchedule,
+            job: jobName,
+            rule_name: rule_name,
+            rule: rule
+
+        })
 
         redis.keys('*', function(err, result) {
             const keys = result.sort()
@@ -360,7 +452,12 @@ function doSchedule(rule_name, jobName, cronSchedule, rule) {
                     context[newKey] = value
                 }
 
-                logging.info('matching rule: ' + rule_name)
+                logging.info('evaluating ', {
+                    action: 'scheduled-job-evaluate',
+                    rule_name: rule_name,
+                    rule: rule,
+                    context: context
+                })
 
                 evalulateValue(
                     context,
@@ -371,12 +468,25 @@ function doSchedule(rule_name, jobName, cronSchedule, rule) {
     }.bind(null, rule))
 
     if (newJob !== null && newJob !== undefined) {
-        logging.info(' scheduled: ' + cronSchedule)
+        logging.info('job scheduled ', {
+            action: 'job-scheduled',
+            schedule: cronSchedule,
+            job: jobName,
+            rule_name: rule_name,
+            rule: rule
+
+        })
+
+
         scheduled_jobs.push(newJob)
     }
 }
 
 function scheduleJobs() {
+    logging.info('scheduling jobs ', {
+        action: 'schedule-jobs'
+    })
+
     scheduleDailyJobs()
 
     scheduled_jobs.forEach(function(job) {
@@ -391,7 +501,8 @@ function scheduleJobs() {
             Object.keys(schedule).forEach(function(schedule_key) {
                 var jobKey = rule_name + '.schedule.' + schedule_key
                 const cronSchedule = schedule[schedule_key]
-                logging.info(jobKey + ' = ' + cronSchedule)
+                logging.debug(jobKey + ' = ' + cronSchedule)
+
                 doSchedule(rule_name, jobKey, cronSchedule, rule)
             }, this)
         }
@@ -432,7 +543,7 @@ function scheduleJobs() {
                     date = solar.solarNoon
 
 
-                logging.info(jobKey + ' offset: ' + offset)
+                logging.debug(jobKey + ' offset: ' + offset)
                 if (date !== null) {
                     var newDate = moment(date).add(offset, 'minutes')
                     doSchedule(rule_name, jobKey, newDate.toDate(), rule)
@@ -449,10 +560,15 @@ function scheduleDailyJobs() {
     if (dailyJob !== null)
         return
 
-    logging.info('Scheduling Daily Job')
+    logging.info('Scheduling Daily Job ', {
+        action: 'schedule-daily-job'
+    })
 
     dailyJob = schedule.scheduleJob('00 00 00 * * * ', function() {
-        logging.info('** Daily Job **')
+        logging.info('Daily job fired ', {
+            action: 'scheduled-daily-job'
+        })
+
         scheduleJobs()
     })
 }
