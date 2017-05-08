@@ -213,9 +213,9 @@ function evaluateProcessor(job, doneEvaluate) {
             var actionQueue = actionQueues[queueName]
             if (actionQueue !== null && actionQueue !== undefined) {
 
-                logging.info('cancelled existing action queue =>(' + queueName + ')', logResult + {
+                logging.info('cancelled existing action queue =>(' + queueName + ')', Object.assign(logResult, {
                     queue_name: queueName
-                })
+                }))
 
                 actionQueue.empty()
             }
@@ -225,13 +225,13 @@ function evaluateProcessor(job, doneEvaluate) {
 
             actionQueue.process(jobProcessor)
 
-            logging.info('enqueued action =>(' + queueName + ')', logResult + {
+            logging.info('enqueued action =>(' + queueName + ')', Object.assign(logResult, {
                 action: 'enqueued-action',
                 delay: perform_after,
                 actions: actions,
                 notify: notify,
                 queue_name: queueName
-            })
+            }))
             actionQueue.add({
                 rule_name: name,
                 notify: notify,
@@ -250,19 +250,19 @@ function evaluateProcessor(job, doneEvaluate) {
         var jexl = new Jexl.Jexl()
 
         jexl.eval(expression, context, function(error, result) {
-            logging.info('  =>(' + name + ') evaluated expression', logResult + {
+            logging.info('  =>(' + name + ') evaluated expression', Object.assign(logResult, {
                 action: 'evaluated-expression',
                 result: result,
                 error: error
-            })
+            }))
             performAction(result, context, name, rule)
             logging.debug('eval queue: ' + name + '    end expression')
             doneEvaluate()
         })
     } else {
-        logging.info('  =>(' + name + ') skipped evaluated expression', logResult + {
+        logging.info('  =>(' + name + ') skipped evaluated expression', Object.assign(logResult, {
             action: 'no-expression-to-evaluate'
-        })
+        }))
         performAction(true, context, name, rule)
         logging.debug('eval queue: ' + name + '    end expression - no expression')
         doneEvaluate()
