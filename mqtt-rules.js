@@ -400,7 +400,7 @@ client.on('message', (topic, message) => {
     //logging.info(' ' + topic + ':' + message)
     var cachedValue = global_value_cache[topic]
 
-    if (false && !_.isNil(cachedValue)) {
+    if (!_.isNil(cachedValue)) {
         if (('' + message).localeCompare(cachedValue) === 0) {
             logging.info(' => value not updated', {
                 action: 'skipped-processing',
