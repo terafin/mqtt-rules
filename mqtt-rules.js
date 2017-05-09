@@ -2,6 +2,8 @@
 const mqtt = require('mqtt')
 var Redis = require('redis')
 var Jexl = require('jexl')
+var async = require('async')
+const _ = require('lodash')
 
 const rules = require('./homeautomation-js-lib/rules.js')
 const logging = require('./homeautomation-js-lib/logging.js')
@@ -54,63 +56,86 @@ function isValueAnExpression(value) {
     return (value.includes('/') || value.includes('?') || value.includes('+'))
 }
 
+var devices_to_monitor = []
+
 var actionQueues = {}
 
+var actionProcessor = function(context, rule_name, valueOrExpression, topic, callback) { // ISOLATED
+    logging.debug('evaluating for publish: ' + topic + '  value: ' + valueOrExpression)
+
+    if (isValueAnExpression(valueOrExpression)) {
+        const publishExpression = update_topic_for_expression(valueOrExpression)
+        var jexl = new Jexl.Jexl()
+        const startTime = new Date()
+        logging.info('  start evaluating publish expression for =>(' + rule_name + ')', {
+            action: 'publish-expression-evaluation-start',
+            start_time: (startTime.getTime()),
+            rule_name: rule_name,
+            expression: publishExpression,
+            topic: topic,
+            value: valueOrExpression
+        })
+        jexl.eval(publishExpression, context,
+            function(publishError, publishResult) {
+                logging.info('  done evaluating publish expression for =>(' + rule_name + ')', {
+                    action: 'publish-expression-evaluation-done',
+                    evaluation_time: ((new Date().getTime()) - startTime.getTime()),
+                    rule_name: rule_name,
+                    expression: publishExpression,
+                    result: publishResult,
+                    topic: topic,
+                    error: publishError,
+                    value: valueOrExpression
+                })
+
+                client.publish(topic, '' + publishResult)
+                logging.info(' published result', {
+                    action: 'published-value',
+                    rule_name: rule_name,
+                    expression: publishExpression,
+                    result: publishResult,
+                    topic: topic,
+                    error: publishError,
+                    value: valueOrExpression
+                })
+
+            })
+    } else {
+        logging.info(' published result', {
+            action: 'published-value',
+            rule_name: rule_name,
+            topic: topic,
+            value: valueOrExpression
+        })
+        client.publish(topic, '' + valueOrExpression)
+    }
+
+
+    callback()
+}
+
 function jobProcessor(job, doneAction) {
+    const queueTime = job.data.queue_time
     const actions = job.data.actions
     const notify = job.data.notify
-    const name = job.data.name
+    const name = job.data.rule_name
     const context = job.data.context
         // const message = job.data.message
         // const topic = job.data.topic
         // const expression = job.data.expression
-
+    const startTime = new Date().getTime()
     logging.debug('action queue: ' + name + '    begin')
-    if (actions !== null && actions !== undefined) {
-        Object.keys(actions).forEach(function(resultTopic) {
-            const publishValue = actions[resultTopic]
-            logging.debug('evaluating for publish: ' + resultTopic + '  value: ' + publishValue)
+    logging.info(' action queue: ' + name, {
+        action: 'job-process-start',
+        rule_name: name,
+        actions: actions,
+        queue_time: (startTime - queueTime)
+    })
 
-            if (isValueAnExpression(publishValue)) {
-                const publishExpression = update_topic_for_expression(publishValue)
-                var jexl = new Jexl.Jexl()
+    if (!_.isNil(actions)) // name, context
+        async.eachOf(actions, actionProcessor.bind(undefined, context, name))
 
-                jexl.eval(publishExpression, context, function(publishError, publishResult) {
-                    logging.info('  done evaluating publish expression for =>(' + name + ')', {
-                        action: 'publish-expression-evaluation-done',
-                        rule_name: name,
-                        expression: publishExpression,
-                        result: publishResult,
-                        topic: resultTopic,
-                        error: publishError,
-                        value: publishValue
-                    })
-
-                    client.publish(resultTopic, '' + publishResult)
-                    logging.info(' published result', {
-                        action: 'published-value',
-                        rule_name: name,
-                        expression: publishExpression,
-                        result: publishResult,
-                        topic: resultTopic,
-                        error: publishError,
-                        value: publishValue
-                    })
-                })
-
-            } else {
-                logging.info(' published result', {
-                    action: 'published-value',
-                    rule_name: name,
-                    topic: resultTopic,
-                    value: publishValue
-                })
-                client.publish(resultTopic, '' + publishValue)
-            }
-        }, this)
-    }
-
-    if (notify !== null && notify !== undefined) {
+    if (!_.isNil(notify)) {
         const baseAppToken = process.env.PUSHOVER_APP_TOKEN
         const baseUserToken = process.env.PUSHOVER_USER_TOKEN
 
@@ -135,7 +160,7 @@ function jobProcessor(job, doneAction) {
             var json = notify
             json.action = 'notify'
             json.rule_name = name
-            if (err !== null && err !== undefined) {
+            if (!_.isNil(err)) {
                 json.error = err
                 logging.info(' failed notification', json)
             } else {
@@ -144,16 +169,26 @@ function jobProcessor(job, doneAction) {
         })
     }
     logging.debug('action queue: ' + name + '    end')
-    doneAction()
+
+    if (!_.isNil(doneAction))
+        doneAction()
+
+    logging.info(' processing done: ' + name, {
+        action: 'job-process-done',
+        rule_name: name,
+        processing_time: ((new Date().getTime()) - startTime)
+    })
 }
 
 var evalQueues = {}
 
 function evaluateProcessor(job, doneEvaluate) {
+    const queue_time = job.data.queue_time
     const name = job.data.name
     const context = job.data.context_value
     const rule = job.data.rule
     const allowed_times = rule.allowed_times
+    const startTime = new Date().getTime()
 
     var logResult = {
         action: 'rule-time-evaluation',
@@ -164,9 +199,15 @@ function evaluateProcessor(job, doneEvaluate) {
     }
     var isOKTime = true
 
+    logging.info(' evaluation queue: ' + name, {
+        action: 'evaluate-process-start',
+        rule_name: name,
+        queue_time: (startTime - queue_time)
+    })
+
     logging.debug('eval queue: ' + name + '    begin')
 
-    if (allowed_times !== null && allowed_times !== undefined) {
+    if (!_.isNil(allowed_times)) {
         isOKTime = false
 
         allowed_times.forEach(function(timeRange) {
@@ -197,7 +238,16 @@ function evaluateProcessor(job, doneEvaluate) {
     if (!isOKTime) {
         logging.info('not evaluating, bad time =>(' + name + ')', logResult)
         logging.debug('eval queue: ' + name + '    end - not a good time')
-        doneEvaluate()
+        logging.info(' evaluation queue: ' + name, {
+            action: 'evaluate-process-done',
+            rule_name: name,
+            queue_time: ((new Date().getTime()) - startTime)
+        })
+
+        if (!_.isNil(doneEvaluate))
+            doneEvaluate()
+
+
         return
     }
 
@@ -206,12 +256,12 @@ function evaluateProcessor(job, doneEvaluate) {
             const actions = rule.actions
             const notify = rule.notify
             var perform_after = rule.perform_after
-            if (perform_after === undefined || perform_after === null) {
+            if (_.isNil(perform_after)) {
                 perform_after = 0
             }
             const queueName = name + '_action'
             var actionQueue = actionQueues[queueName]
-            if (actionQueue !== null && actionQueue !== undefined) {
+            if (!_.isNil(actionQueue)) {
 
                 logging.info('cancelled existing action queue =>(' + queueName + ')', Object.assign(logResult, {
                     queue_name: queueName
@@ -232,32 +282,41 @@ function evaluateProcessor(job, doneEvaluate) {
                 notify: notify,
                 queue_name: queueName
             }))
-            actionQueue.add({
+
+            const data = {
                 rule_name: name,
                 notify: notify,
                 actions: actions,
+                queue_time: (new Date().getTime()),
                 context: context
-            }, {
-                removeOnComplete: true,
-                removeOnFail: true,
-                delay: (perform_after * 1000), // milliseconds
-            })
+            }
+            if (perform_after === 0) {
+                job = {}
+                job.data = data
+                jobProcessor(job, null)
+            } else {
+                actionQueue.add(data, {
+                    removeOnComplete: true,
+                    removeOnFail: true,
+                    delay: (perform_after * 1000), // milliseconds
+                })
+            }
         }
     }
 
-    if (rule.rules !== null && rule.rules !== undefined && rule.rules.expression !== undefined) {
+    if (!_.isNil(rule.rules) && !_.isNil(rule.rules.expression)) {
         const expression = update_topic_for_expression(rule.rules.expression)
         var jexl = new Jexl.Jexl()
-
+        const beginTime = new Date()
         jexl.eval(expression, context, function(error, result) {
             logging.info('  =>(' + name + ') evaluated expression', Object.assign(logResult, {
                 action: 'evaluated-expression',
                 result: result,
+                evaluation_time: ((new Date().getTime()) - beginTime.getTime()),
                 error: error
             }))
             performAction(result, context, name, rule)
             logging.debug('eval queue: ' + name + '    end expression')
-            doneEvaluate()
         })
     } else {
         logging.info('  =>(' + name + ') skipped evaluated expression', Object.assign(logResult, {
@@ -265,8 +324,15 @@ function evaluateProcessor(job, doneEvaluate) {
         }))
         performAction(true, context, name, rule)
         logging.debug('eval queue: ' + name + '    end expression - no expression')
-        doneEvaluate()
     }
+
+    logging.info(' evaluation queue: ' + name, {
+        action: 'evaluate-process-done',
+        rule_name: name,
+        queue_time: ((new Date().getTime()) - startTime)
+    })
+    if (!_.isNil(doneEvaluate))
+        doneEvaluate()
 }
 
 function evalulateValue(in_context, name, rule) {
@@ -274,18 +340,18 @@ function evalulateValue(in_context, name, rule) {
     const queueName = name + '_eval'
     var evalQueue = evalQueues[queueName]
 
-    if (evalQueue !== null && evalQueue !== undefined) {
+    if (!_.isNil(evalQueue)) {
         evalQueue.empty()
     }
 
     const actionQueueName = name + '_action'
     var actionQueue = actionQueues[actionQueueName]
-    if (actionQueue !== null && actionQueue !== undefined) {
+    if (!_.isNil(actionQueue)) {
         actionQueue.empty()
     }
 
     var evaluateAfter = rule.evaluate_after
-    if (evaluateAfter === undefined || evaluateAfter === null) {
+    if (_.isNil(evaluateAfter)) {
         evaluateAfter = 0
     }
 
@@ -297,6 +363,7 @@ function evalulateValue(in_context, name, rule) {
     var job = {
         rule: rule,
         name: '' + name,
+        queue_time: (new Date().getTime()),
         context_value: {}
     }
 
@@ -312,20 +379,28 @@ function evalulateValue(in_context, name, rule) {
         queue_name: queueName
     })
 
-    evalQueue.add(job, {
-        removeOnComplete: true,
-        removeOnFail: true,
-        delay: (evaluateAfter * 1000), // milliseconds
-    })
+    if (evaluateAfter === 0) {
+        job.data = job
+        evaluateProcessor(job, null)
+    } else {
+        evalQueue.add(job, {
+            removeOnComplete: true,
+            removeOnFail: true,
+            delay: (evaluateAfter * 1000), // milliseconds
+        })
+    }
 }
 
 var global_value_cache = {}
 
 client.on('message', (topic, message) => {
+    if (!devices_to_monitor.includes(topic))
+        return
+
     //logging.info(' ' + topic + ':' + message)
     var cachedValue = global_value_cache[topic]
 
-    if (cachedValue !== null && cachedValue !== undefined) {
+    if (false && !_.isNil(cachedValue)) {
         if (('' + message).localeCompare(cachedValue) === 0) {
             logging.info(' => value not updated', {
                 action: 'skipped-processing',
@@ -338,32 +413,44 @@ client.on('message', (topic, message) => {
     }
     global_value_cache[topic] = message
 
-    redis.keys('*', function(err, result) {
-        const keys = result.sort()
-        redis.mget(keys, function(err, values) {
-            var context = {}
+    const redisStartTime = new Date().getTime()
+    logging.info(' redis query', {
+        action: 'redis-query-start',
+        start_time: redisStartTime
+    })
 
-            for (var index = 0; index < keys.length; index++) {
-                const key = keys[index]
-                const value = values[index]
-                const newKey = update_topic_for_expression(key)
-                if (key === topic)
-                    context[newKey] = message
-                else
-                    context[newKey] = value
-            }
+    redis.mget(devices_to_monitor, function(err, values) {
+        logging.info(' redis query done', {
+            action: 'redis-query-done',
+            query_time: ((new Date().getTime()) - redisStartTime)
+        })
+        var context = {}
 
-            context[update_topic_for_expression(topic)] = message
+        for (var index = 0; index < devices_to_monitor.length; index++) {
+            const key = devices_to_monitor[index]
+            const value = values[index]
+            const newKey = update_topic_for_expression(key)
+            if (key === topic)
+                context[newKey] = message
+            else
+                context[newKey] = value
+        }
 
-            rules.ruleIterator(function(rule_name, rule) {
-                const watch = rule.watch
-                if (watch == null || watch == undefined)
-                    return
-                const devices = watch.devices
-                if (devices == null || devices == undefined)
-                    return
+        context[update_topic_for_expression(topic)] = message
 
-                if (devices.indexOf(topic) !== -1) {
+        const ruleStartTime = new Date().getTime()
+        logging.info(' rule processing start ', {
+            action: 'rule-processing-start',
+            start_time: ruleStartTime
+        })
+
+
+        var ruleProcessor = function(rule, rule_name, callback) {
+            logging.debug('rule processor for rule: ' + rule_name)
+            const watch = rule.watch
+
+            if (!_.isNil(watch) && !_.isNil(watch.devices)) {
+                if (watch.devices.indexOf(topic) !== -1) {
                     logging.info('matched topic to rule', {
                         action: 'rule-match',
                         rule_name: rule_name,
@@ -375,7 +462,22 @@ client.on('message', (topic, message) => {
 
                     evalulateValue(context, rule_name, rule)
                 }
-            })
+            }
+
+            callback()
+        }
+
+        var configProcessor = function(config, callback) {
+            logging.debug('rule processor for config: ' + config)
+            async.eachOf(config, ruleProcessor)
+            callback()
+        }
+
+        async.each(rules.get_configs(), configProcessor)
+
+        logging.info(' rule processing done ', {
+            action: 'rule-processing-done',
+            processing_time: ((new Date().getTime()) - ruleStartTime)
         })
     })
 })
@@ -419,10 +521,74 @@ redis.on('connect', function() {
     rules.load_path(config_path)
 })
 
-rules.on('rules-loaded', () => {
-    logging.info('rules loaded ', {
-        action: 'rules-loaded'
+function unique(list) {
+    var result = []
+    list.forEach(function(e) {
+        if (!result.includes(e))
+            result.push(e)
     })
+    return result
+}
+
+rules.on('rules-loaded', () => {
+    devices_to_monitor = []
+
+    rules.ruleIterator(function(rule_name, rule) {
+        const watch = rule.watch
+        if (!_.isNil(watch)) {
+            const devices = watch.devices
+            if (!_.isNil(devices)) {
+                devices.forEach(function(device) {
+                    devices_to_monitor.push(device)
+                }, this)
+            }
+        }
+
+        const rules = rule.rules
+        if (!_.isNil(rules)) {
+            const expression = rules.expression
+            logging.debug('expression :' + expression)
+            if (!_.isNil(expression)) {
+
+                var foundDevices = expression.match(/\/([a-z,0-9,\-,_,/])*/g)
+
+                if (!_.isNil(foundDevices)) {
+                    foundDevices.forEach(function(device) {
+                        devices_to_monitor.push(device)
+                    }, this)
+                }
+            }
+        }
+
+        const actions = rule.actions
+        if (!_.isNil(actions)) {
+            Object.keys(actions).forEach(function(action) {
+                const action_value = actions[action]
+
+                var foundDevices = action_value.match(/\/([a-z,0-9,\-,_,/])*/g)
+
+                if (!_.isNil(foundDevices)) {
+                    foundDevices.forEach(function(device) {
+                        devices_to_monitor.push(device)
+                    }, this)
+                }
+            }, this)
+        }
+
+    })
+
+    devices_to_monitor = unique(devices_to_monitor)
+
+    logging.info('rules loaded ', {
+        action: 'rules-loaded',
+        devices_to_monitor: devices_to_monitor
+    })
+
+    redis.mget(devices_to_monitor, function(err, values) {
+        logging.debug('devices :' + JSON.stringify(devices_to_monitor))
+        logging.debug('values :' + JSON.stringify(values))
+    })
+
     scheduleJobs()
 })
 
@@ -440,34 +606,31 @@ function doSchedule(rule_name, jobName, cronSchedule, rule) {
 
         })
 
-        redis.keys('*', function(err, result) {
-            const keys = result.sort()
-            redis.mget(keys, function(err, values) {
-                var context = {}
+        redis.mget(devices_to_monitor, function(err, values) {
+            var context = {}
 
-                for (var index = 0; index < keys.length; index++) {
-                    const key = keys[index]
-                    const value = values[index]
-                    const newKey = update_topic_for_expression(key)
-                    context[newKey] = value
-                }
+            for (var index = 0; index < devices_to_monitor.length; index++) {
+                const key = devices_to_monitor[index]
+                const value = values[index]
+                const newKey = update_topic_for_expression(key)
+                context[newKey] = value
+            }
 
-                logging.info('evaluating ', {
-                    action: 'scheduled-job-evaluate',
-                    rule_name: rule_name,
-                    rule: rule,
-                    context: context
-                })
-
-                evalulateValue(
-                    context,
-                    rule_name,
-                    rule)
+            logging.info('evaluating ', {
+                action: 'scheduled-job-evaluate',
+                rule_name: rule_name,
+                rule: rule,
+                context: context
             })
+
+            evalulateValue(
+                context,
+                rule_name,
+                rule)
         })
     }.bind(null, rule))
 
-    if (newJob !== null && newJob !== undefined) {
+    if (!_.isNil(newJob)) {
         logging.info('job scheduled ', {
             action: 'job-scheduled',
             schedule: cronSchedule,
@@ -497,7 +660,7 @@ function scheduleJobs() {
         const schedule = rule.schedule
         const daily = rule.daily
 
-        if (schedule !== null && schedule !== undefined) {
+        if (!_.isNil(schedule)) {
             Object.keys(schedule).forEach(function(schedule_key) {
                 var jobKey = rule_name + '.schedule.' + schedule_key
                 const cronSchedule = schedule[schedule_key]
@@ -507,15 +670,15 @@ function scheduleJobs() {
             }, this)
         }
 
-        if (daily !== null && daily !== undefined) {
+        if (!_.isNil(daily)) {
 
             Object.keys(daily).forEach(function(daily_key) {
                 var solar = new SolarCalc(new Date(), Number(solarLat), Number(solarLong))
                 var jobKey = rule_name + '.daily.' + daily_key
                 const dailyValue = daily[daily_key]
                 var offset = 0
-                if (dailyValue !== null && dailyValue !== undefined) {
-                    if (dailyValue.offset === null || dailyValue.offset === undefined)
+                if (!_.isNil(dailyValue)) {
+                    if (_.isNil(dailyValue.offset))
                         offset = 0
                     else
                         offset = Number(dailyValue.offset)
@@ -544,7 +707,7 @@ function scheduleJobs() {
 
 
                 logging.debug(jobKey + ' offset: ' + offset)
-                if (date !== null) {
+                if (!_.isNil(date)) {
                     var newDate = moment(date).add(offset, 'minutes')
                     doSchedule(rule_name, jobKey, newDate.toDate(), rule)
                 }
@@ -557,7 +720,7 @@ function scheduleJobs() {
 var dailyJob = null
 
 function scheduleDailyJobs() {
-    if (dailyJob !== null)
+    if (!_.isNil(dailyJob))
         return
 
     logging.info('Scheduling Daily Job ', {
