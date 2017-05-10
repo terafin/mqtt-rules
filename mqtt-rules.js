@@ -39,9 +39,41 @@ var client = mqtt.setupClient(function() {
 
 
 function update_topic_for_expression(topic) {
-    topic = topic.replace(/\//g, '________')
-    topic = topic.replace(/-/g, '_')
+    topic = topic.replace(/(\/)(?=\w+)/g, '_')
+    topic = topic.replace(/[-,+]\w+/g, '_')
+
     return topic
+}
+
+function prepareExpression(expression, context) {
+    if (_.isNil(context)) return expression
+
+    const variables = Object.keys(context).sort(function(a, b) {
+        // ASC  -> a.length - b.length
+        // DESC -> b.length - a.length
+        return b.length - a.length
+    })
+    var newExpression = expression
+
+    variables.forEach(function(variable) {
+        const value = context[variable]
+        if (value.length == 1) return
+        logging.debug('    variable: ' + variable + '   value: ' + value)
+
+        newExpression = newExpression.replace(variable, value)
+    }, this)
+
+    return newExpression
+}
+
+function convertToNumberIfNeeded(value) {
+    const numberValue = Number(value)
+    if (!_.isNil(numberValue) && numberValue == value) {
+        logging.debug('converting string: ' + value + ' to number: ' + numberValue)
+        return numberValue
+    }
+
+    return value
 }
 
 function isValueAnExpression(value) {
@@ -56,7 +88,7 @@ var actionProcessor = function(context, rule_name, valueOrExpression, topic, cal
     logging.debug('evaluating for publish: ' + topic + '  value: ' + valueOrExpression)
 
     if (isValueAnExpression(valueOrExpression)) {
-        const publishExpression = update_topic_for_expression(valueOrExpression)
+        const publishExpression = prepareExpression(update_topic_for_expression(valueOrExpression), context)
         var jexl = new Jexl.Jexl()
         const startTime = new Date()
         logging.info('  start evaluating publish expression for =>(' + rule_name + ')', {
@@ -74,6 +106,7 @@ var actionProcessor = function(context, rule_name, valueOrExpression, topic, cal
                     evaluation_time: ((new Date().getTime()) - startTime.getTime()),
                     rule_name: rule_name,
                     expression: publishExpression,
+                    context: context,
                     result: publishResult,
                     topic: topic,
                     error: publishError,
@@ -297,7 +330,7 @@ function evaluateProcessor(job, doneEvaluate) {
     }
 
     if (!_.isNil(rule.rules) && !_.isNil(rule.rules.expression)) {
-        const expression = update_topic_for_expression(rule.rules.expression)
+        const expression = prepareExpression(update_topic_for_expression(rule.rules.expression), context)
         var jexl = new Jexl.Jexl()
         const beginTime = new Date()
         jexl.eval(expression, context, function(error, result) {
@@ -389,6 +422,8 @@ client.on('message', (topic, message) => {
     if (!devices_to_monitor.includes(topic))
         return
 
+    message = convertToNumberIfNeeded(message)
+
     //logging.info(' ' + topic + ':' + message)
     var cachedValue = global_value_cache[topic]
 
@@ -423,9 +458,9 @@ client.on('message', (topic, message) => {
             const value = values[index]
             const newKey = update_topic_for_expression(key)
             if (key === topic)
-                context[newKey] = message
+                context[newKey] = convertToNumberIfNeeded(message)
             else
-                context[newKey] = value
+                context[newKey] = convertToNumberIfNeeded(value)
         }
 
         context[update_topic_for_expression(topic)] = message
@@ -447,7 +482,7 @@ client.on('message', (topic, message) => {
                         action: 'rule-match',
                         rule_name: rule_name,
                         topic: topic,
-                        message: message,
+                        message: convertToNumberIfNeeded(message),
                         rule: rule,
                         context: context
                     })
@@ -573,7 +608,7 @@ function doSchedule(rule_name, jobName, cronSchedule, rule) {
                 const key = devices_to_monitor[index]
                 const value = values[index]
                 const newKey = update_topic_for_expression(key)
-                context[newKey] = value
+                context[newKey] = convertToNumberIfNeeded(value)
             }
 
             logging.info('evaluating ', {
