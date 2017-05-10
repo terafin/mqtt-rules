@@ -15,36 +15,28 @@ const moment = require('moment')
 
 require('./homeautomation-js-lib/devices.js')
 require('./homeautomation-js-lib/mqtt_helpers.js')
+require('./homeautomation-js-lib/redis_helpers.js')
 
 const solarLat = process.env.LOCATION_LAT
 const solarLong = process.env.LOCATION_LONG
-
 const redisHost = process.env.REDIS_HOST
 const redisPort = process.env.REDIS_PORT
-const redisDB = process.env.REDIS_DATABASE
+
 const config_path = process.env.TRANSFORM_CONFIG_PATH
 
-// Config
-const host = process.env.MQTT_HOST
-
 // Setup MQTT
-var client = mqtt.connect(host)
-
-// MQTT Observation
-
-client.on('connect', () => {
+var client = mqtt.setupClient(function() {
     logging.info('MQTT Connected', {
         action: 'mqtt-connected'
     })
     client.subscribe('#')
-})
 
-client.on('disconnect', () => {
+}, function() {
     logging.error('Disconnected', {
         action: 'mqtt-disconnected'
     })
-    client.connect(host)
 })
+
 
 function update_topic_for_expression(topic) {
     topic = topic.replace(/\//g, '________')
@@ -482,42 +474,10 @@ client.on('message', (topic, message) => {
     })
 })
 
-const redis = Redis.createClient({
-    host: redisHost,
-    port: redisPort,
-    db: redisDB,
-    retry_strategy: function(options) {
-        if (options.error && options.error.code === 'ECONNREFUSED') {
-            // End reconnecting on a specific error and flush all commands with a individual error
-            return new Error('The server refused the connection')
-        }
-        if (options.total_retry_time > 1000 * 60 * 60) {
-            // End reconnecting after a specific timeout and flush all commands with a individual error
-            return new Error('Retry time exhausted')
-        }
-        if (options.times_connected > 10) {
-            // End reconnecting with built in error
-            return undefined
-        }
-        // reconnect after
-        return Math.min(options.attempt * 100, 3000)
-    }
-})
-
-// redis callbacks
-
-redis.on('error', function(err) {
-    logging.error('redis error ' + err, {
-        action: 'redis-error',
-        error: err
-    })
-})
-
-redis.on('connect', function() {
+const redis = Redis.setupClient(function() {
     logging.info('redis connected ', {
         action: 'redis-connected'
     })
-
     rules.load_path(config_path)
 })
 
