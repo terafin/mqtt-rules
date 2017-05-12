@@ -57,10 +57,11 @@ function prepareExpression(expression, context) {
 
     variables.forEach(function(variable) {
         const value = context[variable]
-        if (value.length == 1) return
-        logging.debug('    variable: ' + variable + '   value: ' + value)
+        if (variable.length == 1) return
 
-        newExpression = newExpression.replace(variable, value)
+        if (_.isNumber(value)) {
+            newExpression = newExpression.replace(variable, value)
+        }
     }, this)
 
     return newExpression
