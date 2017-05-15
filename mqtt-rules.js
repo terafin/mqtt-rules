@@ -70,7 +70,7 @@ function prepareExpression(expression, context) {
 function convertToNumberIfNeeded(value) {
     const numberValue = Number(value)
     if (!_.isNil(numberValue) && numberValue == value) {
-        logging.debug('converting string: ' + value + ' to number: ' + numberValue)
+        //logging.debug('converting string: ' + value + ' to number: ' + numberValue)
         return numberValue
     }
 
@@ -474,7 +474,7 @@ client.on('message', (topic, message) => {
 
 
         var ruleProcessor = function(rule, rule_name, callback) {
-            logging.debug('rule processor for rule: ' + rule_name)
+            //logging.debug('rule processor for rule: ' + rule_name)
             const watch = rule.watch
 
             if (!_.isNil(watch) && !_.isNil(watch.devices)) {
