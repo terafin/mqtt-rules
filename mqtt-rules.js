@@ -496,7 +496,6 @@ client.on('message', (topic, message) => {
         }
 
         var configProcessor = function(config, callback) {
-            logging.debug('rule processor for config: ' + config)
             async.eachOf(config, ruleProcessor)
             callback()
         }
