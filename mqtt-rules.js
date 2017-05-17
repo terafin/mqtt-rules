@@ -140,6 +140,84 @@ var actionProcessor = function(context, rule_name, valueOrExpression, topic, cal
     callback()
 }
 
+var handleNotification = function(name, notify_config) {
+    const baseAppToken = process.env.PUSHOVER_APP_TOKEN
+    const baseUserToken = process.env.PUSHOVER_USER_TOKEN
+    var p = new pushover({
+        user: (notify_config.user ? notify_config.user : baseUserToken),
+        token: (notify_config.token ? notify_config.token : baseAppToken)
+    })
+
+
+    if (_.isNil(notify_config.message)) {
+        logging.info(' Empty notification message', notify_config)
+        return
+    }
+
+    if (_.isNil(notify_config.title)) {
+        logging.info(' Empty notification title', notify_config)
+        return
+    }
+
+    var msg = {
+        // These values correspond to the parameters detailed on https://pushover.net/api
+        // 'message' is required. All other values are optional.
+        message: notify_config.message,
+        title: notify_config.title,
+        sound: notify_config.sound,
+        device: notify_config.device,
+        priority: notify_config.priority,
+        url: notify_config.url,
+        url_title: notify_config.url_title,
+    }
+
+    p.send(msg, function(err, result) {
+        var json = notify_config
+        json.action = 'notify'
+        json.rule_name = name
+        if (!_.isNil(err)) {
+            json.error = err
+            logging.info(' failed notification', json)
+        } else {
+            logging.info(' successfully notified', json)
+        }
+    })
+}
+
+var notificationProcessor = function(context, rule_name, notify_config, notify_name, callback) { // ISOLATED
+    logging.debug('evaluating for notify: ' + notify_name + '  notify_config: ' + notify_config)
+    var expression = notify_config.expression
+    const publishExpression = prepareExpression(update_topic_for_expression(expression), context)
+    var jexl = new Jexl.Jexl()
+    const startTime = new Date()
+    logging.info('  start evaluating publish expression for =>(' + rule_name + ')', {
+        action: 'publish-notification-evaluation-start',
+        start_time: (startTime.getTime()),
+        rule_name: rule_name,
+        expression: publishExpression
+    })
+    jexl.eval(publishExpression, context,
+        function(publishError, publishResult) {
+            logging.info('  done evaluating publish expression for =>(' + rule_name + ')', {
+                action: 'publish-notification-evaluation-done',
+                evaluation_time: ((new Date().getTime()) - startTime.getTime()),
+                rule_name: rule_name,
+                expression: publishExpression,
+                context: context,
+                result: publishResult,
+                error: publishError
+            })
+
+            if (publishResult == true) {
+                handleNotification(rule_name, notify_config)
+            }
+        })
+
+
+    callback()
+}
+
+
 function jobProcessor(job, doneAction) {
     const queueTime = job.data.queue_time
     const actions = job.data.actions
@@ -162,38 +240,15 @@ function jobProcessor(job, doneAction) {
         async.eachOf(actions, actionProcessor.bind(undefined, context, name))
 
     if (!_.isNil(notify)) {
-        const baseAppToken = process.env.PUSHOVER_APP_TOKEN
-        const baseUserToken = process.env.PUSHOVER_USER_TOKEN
-
-        var p = new pushover({
-            user: (notify.user ? notify.user : baseUserToken),
-            token: (notify.token ? notify.token : baseAppToken)
-        })
-
-        var msg = {
-            // These values correspond to the parameters detailed on https://pushover.net/api
-            // 'message' is required. All other values are optional.
-            message: notify.message,
-            title: notify.title,
-            sound: notify.sound,
-            device: notify.device,
-            priority: notify.priority,
-            url: notify.url,
-            url_title: notify.url_title,
+        if (!_.isNil(notify.if)) {
+            logging.debug(' checking notification evaluation')
+            async.eachOf(notify.if, notificationProcessor.bind(undefined, context, name))
+        } else {
+            logging.debug(' directly notifying')
+            handleNotification(name, notify)
         }
-
-        p.send(msg, function(err, result) {
-            var json = notify
-            json.action = 'notify'
-            json.rule_name = name
-            if (!_.isNil(err)) {
-                json.error = err
-                logging.info(' failed notification', json)
-            } else {
-                logging.info(' successfully notified', json)
-            }
-        })
     }
+
     logging.debug('action queue: ' + name + '    end')
 
     if (!_.isNil(doneAction))
