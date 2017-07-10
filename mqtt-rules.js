@@ -504,9 +504,7 @@ app.get('/events/', function(req, res) {
         })
 
         html += '</tbody>\n'
-
         html += '</table>\n'
-
 
         html += '</body>\n'
         html += '</html>'
