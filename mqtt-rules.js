@@ -35,17 +35,16 @@ global.publishEvents = []
 
 global.publish = function(rule_name, expression, valueOrExpression, topic, message) {
     global.client.publish(topic, message)
+        // var event = {}
 
-    var event = {}
+    // event.rule_name = rule_name
+    // event.expression = expression
+    // event.valueOrExpression = valueOrExpression
+    // event.topic = topic
+    // event.message = message
+    // event.date = new Date()
 
-    event.rule_name = rule_name
-    event.expression = expression
-    event.valueOrExpression = valueOrExpression
-    event.topic = topic
-    event.message = message
-    event.date = new Date()
-
-    global.publishEvents.push(event)
+    // global.publishEvents.push(event)
 }
 
 global.devices_to_monitor = []
@@ -112,6 +111,7 @@ global.client.on('message', (topic, message) => {
 
             if (!_.isNil(watch) && !_.isNil(watch.devices)) {
                 if (watch.devices.indexOf(topic) !== -1) {
+
                     logging.info('matched topic to rule', {
                         action: 'rule-match',
                         rule_name: rule_name,
