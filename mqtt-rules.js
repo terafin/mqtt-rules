@@ -155,11 +155,15 @@ global.client.on('message', (topic, message) => {
                 context[newKey] = utilities.convertToNumberIfNeeded(value)
         }
 
-        var jsonFound = JSON.parse(message)
-        if (!_.isNil(jsonFound)) {
-            Object.keys(jsonFound).forEach(function(key) {
-                context[key] = jsonFound[key]
-            })
+        try {
+            var jsonFound = JSON.parse(message)
+            if (!_.isNil(jsonFound)) {
+                Object.keys(jsonFound).forEach(function(key) {
+                    context[key] = jsonFound[key]
+                })
+            }
+        } catch (err) {
+            logging.debug('invalid json')
         }
 
         global.changeProcessor(rules.get_configs(), context, topic, message)
