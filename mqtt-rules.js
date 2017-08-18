@@ -3,7 +3,11 @@ const mqtt = require('mqtt')
 var Redis = require('redis')
 var async = require('async')
 const _ = require('lodash')
-const is_test_mode = process.env.TEST_MODE
+var is_test_mode = process.env.TEST_MODE
+
+if (is_test_mode != true) {
+    is_test_mode = false
+}
 
 const rules = require('./homeautomation-js-lib/rules.js')
 const logging = require('./homeautomation-js-lib/logging.js')
@@ -61,10 +65,10 @@ global.changeProcessor = function(rules, context, topic, message) {
         start_time: ruleStartTime
     })
 
-    // console.log('  topic: ' + topic)
-    // console.log('message: ' + message)
-    // console.log('  rules: ' + JSON.stringify(rules))
-    // console.log('context: ' + JSON.stringify(context))
+    // logging.info('  topic: ' + topic)
+    // logging.info('message: ' + message)
+    // logging.info('  rules: ' + JSON.stringify(rules))
+    // logging.info('context: ' + JSON.stringify(context))
 
     var ruleProcessor = function(rule, rule_name, callback) {
         //logging.debug('rule processor for rule: ' + rule_name)
@@ -112,7 +116,7 @@ global.client.on('message', (topic, message) => {
 
     message = utilities.convertToNumberIfNeeded(message)
 
-    // //logging.info(' ' + topic + ':' + message)
+    // logging.info(' ' + topic + ':' + message)
     // var cachedValue = global_value_cache[topic]
 
     // if (!_.isNil(cachedValue)) {
@@ -167,8 +171,13 @@ global.redis = Redis.setupClient(function() {
         action: 'redis-connected'
     })
 
-    if (is_test_mode == false)
+    if (is_test_mode == false) {
+        logging.info('loading rules')
         rules.load_path(config_path)
+    } else {
+        logging.info('not - loading rules')
+
+    }
 })
 
 rules.on('rules-loaded', () => {
@@ -176,6 +185,7 @@ rules.on('rules-loaded', () => {
         logging.info('test mode, not loading rules')
         return
     }
+    logging.info('Loading rules')
 
     global.devices_to_monitor = []
 
