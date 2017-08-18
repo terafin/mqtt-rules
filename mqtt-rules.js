@@ -3,6 +3,7 @@ const mqtt = require('mqtt')
 var Redis = require('redis')
 var async = require('async')
 const _ = require('lodash')
+const is_test_mode = process.env.TEST_MODE
 
 const rules = require('./homeautomation-js-lib/rules.js')
 const logging = require('./homeautomation-js-lib/logging.js')
@@ -48,9 +49,64 @@ global.publish = function(rule_name, expression, valueOrExpression, topic, messa
 
 global.devices_to_monitor = []
 
-var global_value_cache = {}
+//var global_value_cache = {}
+
+
+global.changeProcessor = function(rules, context, topic, message) {
+    context[utilities.update_topic_for_expression(topic)] = message
+
+    const ruleStartTime = new Date().getTime()
+    logging.info(' rule processing start ', {
+        action: 'rule-processing-start',
+        start_time: ruleStartTime
+    })
+
+    // console.log('  topic: ' + topic)
+    // console.log('message: ' + message)
+    // console.log('  rules: ' + JSON.stringify(rules))
+    // console.log('context: ' + JSON.stringify(context))
+
+    var ruleProcessor = function(rule, rule_name, callback) {
+        //logging.debug('rule processor for rule: ' + rule_name)
+        const watch = rule.watch
+
+        if (!_.isNil(watch) && !_.isNil(watch.devices)) {
+            if (watch.devices.indexOf(topic) !== -1) {
+
+                logging.info('matched topic to rule', {
+                    action: 'rule-match',
+                    rule_name: rule_name,
+                    topic: topic,
+                    message: utilities.convertToNumberIfNeeded(message),
+                    rule: rule,
+                    context: context
+                })
+
+                evaluation.evalulateValue(topic, context, rule_name, rule)
+            }
+        }
+
+        callback()
+    }
+
+    var configProcessor = function(config, callback) {
+        async.eachOf(config, ruleProcessor)
+        callback()
+    }
+
+    async.each(rules, configProcessor)
+
+    logging.info(' rule processing done ', {
+        action: 'rule-processing-done',
+        processing_time: ((new Date().getTime()) - ruleStartTime)
+    })
+}
+
 
 global.client.on('message', (topic, message) => {
+    if (is_test_mode == true)
+        return
+
     if (!global.devices_to_monitor.includes(topic))
         return
 
@@ -95,49 +151,14 @@ global.client.on('message', (topic, message) => {
                 context[newKey] = utilities.convertToNumberIfNeeded(value)
         }
 
-        context[utilities.update_topic_for_expression(topic)] = message
-
-        const ruleStartTime = new Date().getTime()
-        logging.info(' rule processing start ', {
-            action: 'rule-processing-start',
-            start_time: ruleStartTime
-        })
-
-
-        var ruleProcessor = function(rule, rule_name, callback) {
-            //logging.debug('rule processor for rule: ' + rule_name)
-            const watch = rule.watch
-
-            if (!_.isNil(watch) && !_.isNil(watch.devices)) {
-                if (watch.devices.indexOf(topic) !== -1) {
-
-                    logging.info('matched topic to rule', {
-                        action: 'rule-match',
-                        rule_name: rule_name,
-                        topic: topic,
-                        message: utilities.convertToNumberIfNeeded(message),
-                        rule: rule,
-                        context: context
-                    })
-
-                    evaluation.evalulateValue(topic, context, rule_name, rule)
-                }
-            }
-
-            callback()
+        var jsonFound = JSON.parse(message)
+        if (!_.isNil(jsonFound)) {
+            Object.keys(jsonFound).forEach(function(key) {
+                context[key] = jsonFound[key]
+            })
         }
 
-        var configProcessor = function(config, callback) {
-            async.eachOf(config, ruleProcessor)
-            callback()
-        }
-
-        async.each(rules.get_configs(), configProcessor)
-
-        logging.info(' rule processing done ', {
-            action: 'rule-processing-done',
-            processing_time: ((new Date().getTime()) - ruleStartTime)
-        })
+        global.changeProcessor(rules.get_configs(), context, topic, message)
     })
 })
 
@@ -145,10 +166,17 @@ global.redis = Redis.setupClient(function() {
     logging.info('redis connected ', {
         action: 'redis-connected'
     })
-    rules.load_path(config_path)
+
+    if (is_test_mode == false)
+        rules.load_path(config_path)
 })
 
 rules.on('rules-loaded', () => {
+    if (is_test_mode == true) {
+        logging.info('test mode, not loading rules')
+        return
+    }
+
     global.devices_to_monitor = []
 
     rules.ruleIterator(function(rule_name, rule) {
@@ -209,3 +237,7 @@ rules.on('rules-loaded', () => {
 
     schedule.scheduleJobs()
 })
+
+global.clearQueues = function() {
+    evaluation.clearQueues()
+}

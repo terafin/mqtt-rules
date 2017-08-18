@@ -8,15 +8,18 @@
         "url": "https://github.com/terafin/mqtt-rules"
     },
     "scripts": {
-        "start": "node mqtt-rules.js"
+        "start": "node mqtt-rules.js",
+        "test": "mocha"
     },
     "dependencies": {
         "async": "^2.4.0",
         "bull": "2.2.6",
+        "chai": "^4.1.1",
         "express": "^4.15.3",
         "jexl": "^1.1.4",
         "js-yaml": "^3.8.3",
         "lodash": "^4.17.4",
+        "mocha": "^3.5.0",
         "moment": "^2.18.1",
         "mqtt": "^2.6.2",
         "node-schedule": "^1.2.1",
