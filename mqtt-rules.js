@@ -38,6 +38,7 @@ global.client = mqtt.setupClient(function() {
 global.publishEvents = []
 
 global.publish = function(rule_name, expression, valueOrExpression, topic, message) {
+    logging.info('=> rule: ' + rule_name + '  publishing: ' + topic + ':' + message + ' (expression: ' + expression + ' | value: ' + valueOrExpression + ')')
     global.client.publish(topic, message)
         // var event = {}
 
@@ -60,7 +61,7 @@ global.changeProcessor = function(rules, context, topic, message) {
     context[utilities.update_topic_for_expression(topic)] = message
 
     const ruleStartTime = new Date().getTime()
-    logging.info(' rule processing start ', {
+    logging.verbose(' rule processing start ', {
         action: 'rule-processing-start',
         start_time: ruleStartTime
     })
@@ -133,13 +134,13 @@ global.client.on('message', (topic, message) => {
     // global_value_cache[topic] = message
 
     const redisStartTime = new Date().getTime()
-    logging.info(' redis query', {
+    logging.verbose(' redis query', {
         action: 'redis-query-start',
         start_time: redisStartTime
     })
 
     global.redis.mget(global.devices_to_monitor, function(err, values) {
-        logging.info(' redis query done', {
+        logging.verbose(' redis query done', {
             action: 'redis-query-done',
             query_time: ((new Date().getTime()) - redisStartTime)
         })
