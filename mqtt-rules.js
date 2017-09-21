@@ -78,7 +78,7 @@ global.changeProcessor = function(rules, context, topic, message) {
         if (!_.isNil(watch) && !_.isNil(watch.devices)) {
             if (watch.devices.indexOf(topic) !== -1) {
 
-                logging.info('matched topic to rule', {
+                logging.verbose('matched topic to rule', {
                     action: 'rule-match',
                     rule_name: rule_name,
                     topic: topic,
@@ -101,7 +101,7 @@ global.changeProcessor = function(rules, context, topic, message) {
 
     async.each(rules, configProcessor)
 
-    logging.info(' rule processing done ', {
+    logging.verbose(' rule processing done ', {
         action: 'rule-processing-done',
         processing_time: ((new Date().getTime()) - ruleStartTime)
     })
