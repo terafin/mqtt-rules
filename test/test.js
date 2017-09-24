@@ -1,4 +1,3 @@
-var assert = require('assert')
 const _ = require('lodash')
 
 const yaml = require('js-yaml')
@@ -108,11 +107,14 @@ describe('quick trigger tests', function() {
             devices: ["/test/presence/geofence/home/justin", "/test/presence/geofence/home/elene"] \n\
           actions: \n\
             "/test/home/mode": "1"')
+
         setupTest('/test/home/mode', '0', done)
 
-        global.changeProcessor([rule], {}, '/test/presence/geofence/home/mode', '1')
-        global.changeProcessor([rule], {}, '/test/presence/geofence/home/justin', '1')
-        global.changeProcessor([rule], {}, '/test/presence/geofence/home/elene', '0')
+        const context = {
+            '/test/home/mode': '1',
+            '/test/presence/geofence/home/justin': '0'
+        }
+        global.changeProcessor([rule], context, '/test/presence/geofence/home/elene', '1')
     }).timeout(500)
 
     it('test away mode (and)', function(done) {
