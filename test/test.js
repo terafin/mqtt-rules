@@ -22,6 +22,10 @@ var generateRule = function(ruleString) {
 }
 
 global.client.on('message', (topic, message) => {
+    if (topic.startsWith('happy'))
+        return
+    console.log('incoming: ' + topic + ':' + message)
+    console.log('  looking for: ' + targetTestTopic + ':' + targetTestMessage)
     if (topic == targetTestTopic &&
         message == targetTestMessage) {
         if (!_.isNull(targetCallback)) {
@@ -106,7 +110,7 @@ describe('quick trigger tests', function() {
           watch: \n\
             devices: ["/test/presence/geofence/home/justin", "/test/presence/geofence/home/elene"] \n\
           actions: \n\
-            "/test/home/mode": "1"')
+            "/test/home/mode": "0"')
 
         setupTest('/test/home/mode', '0', done)
 
@@ -121,17 +125,22 @@ describe('quick trigger tests', function() {
         const rule = generateRule(
             'test_nobody_home_mode: \n\
           rules: \n\
-            expression: "(/test/presence/geofence/home/justin == 0 && /test/presence/geofence/home/elene == 0) && (/test/home/mode == 0 || /test/home/mode == 2)" \n\
+            expression: "(/test/presence/geofence/home/justin == 0) && (/test/presence/geofence/home/elene == 0) && (/test/home/mode == 0 || /test/home/mode == 2)" \n\
           watch: \n\
             devices: ["/test/presence/geofence/home/justin", "/test/presence/geofence/home/elene"] \n\
           actions: \n\
             "/test/home/mode": "1"')
 
+
         setupTest('/test/home/mode', '1', done)
 
-        global.changeProcessor([rule], {}, '/test/presence/geofence/home/mode', '0')
-        global.changeProcessor([rule], {}, '/test/presence/geofence/home/justin', '0')
-        global.changeProcessor([rule], {}, '/test/presence/geofence/home/elene', '0')
+        const context = {
+            '/test/home/mode': '0',
+            '/test/presence/geofence/home/justin': '0',
+            '/test/presence/geofence/home/elene': '1'
+
+        }
+        global.changeProcessor([rule], context, '/test/presence/geofence/home/elene', '0')
     }).timeout(500)
 
     it('delayed evaluate of 1s', function(done) {
