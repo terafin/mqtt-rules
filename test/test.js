@@ -10,12 +10,19 @@ require('../mqtt-rules.js')
 var targetTestTopic = null
 var targetTestMessage = null
 var targetCallback = null
+var targetEarliestDate = null
 
 
-var setupTest = function(topic, message, callback) {
+var setupTest = function(topic, message, callback, minimumTime) {
     targetTestTopic = topic
     targetTestMessage = message
     targetCallback = callback
+    if (!_.isNil(minimumTime) && minimumTime > 0) {
+        targetEarliestDate = new Date(new Date().getTime() + (minimumTime * 1000))
+            // console.log('minimum fire date: ' + targetEarliestDate)
+    } else {
+        targetEarliestDate = null
+    }
 }
 
 var generateRule = function(ruleString) {
@@ -41,9 +48,20 @@ global.client.on('message', (topic, message) => {
     if (topic == targetTestTopic &&
         message == targetTestMessage) {
         if (!_.isNull(targetCallback)) {
+            var tooEarly = false
+            if (targetEarliestDate != null) {
+                const now = new Date()
+                    // console.log('minimum fire date: ' + targetEarliestDate + '   now: ' + now)
+                if (now < targetEarliestDate) {
+                    tooEarly = true
+                }
+            }
             var oldCallBack = targetCallback
             setTimeout(function cb() {
-                oldCallBack()
+                if (tooEarly)
+                    oldCallBack('test finished too early')
+                else
+                    oldCallBack()
             })
             targetCallback = null
         }
@@ -95,22 +113,68 @@ describe('quick trigger tests', function() {
         global.changeProcessor([rule], {}, '/test/motion', '0')
     }).timeout(500)
 
-    it('test comparing values for true/false', function(done) {
-        // is_cooler_outside:
-        //     watch:
-        //       devices: ["/environment/temperatures/current_area", "/environment/temperature/outdoors"]
-        //     actions:
-        //       "/environment/temperatures/is_cooler_outside": "(/environment/temperatures/current_area > (/environment/temperature/outdoors + 0.5) ? 1 : 0"
-        done()
+    it('test comparing values for true', function(done) {
+        const rule = generateRule(
+            'is_cooler_outside: \n\
+        watch:  \n\
+            devices: ["/test/environment/temperatures/current_area", "/test/environment/temperature/outdoors"] \n\
+        actions:  \n\
+            "/test/environment/temperatures/is_cooler_outside": "(/test/environment/temperatures/current_area > (/test/environment/temperature/outdoors + 0.5) ? 1 : 0" \n')
+
+        setupTest('/test/environment/temperatures/is_cooler_outside', '1', done)
+
+        const context = {
+            '/test/environment/temperatures/current_area': '20',
+        }
+        global.changeProcessor([rule], generateContext(context), '/test/environment/temperature/outdoors', '15')
     }).timeout(500)
 
-    it('test averaging numbers', function(done) {
-        // sleeping_area_temperature_calculator:
-        //     watch:
-        //       devices: ["/environment/thermostat/temperature/bedroom", "/environment/thermostat/temperature/guest_bedroom"]
-        //     actions:
-        //       "/environment/temperatures/sleeping_area": "(/environment/thermostat/temperature/bedroom + /environment/thermostat/temperature/guest_bedroom) / 2"
-        done()
+    it('test comparing values for false', function(done) {
+        const rule = generateRule(
+            'is_cooler_outside: \n\
+        watch:  \n\
+            devices: ["/test/environment/temperatures/current_area", "/test/environment/temperature/outdoors"] \n\
+        actions:  \n\
+            "/test/environment/temperatures/is_cooler_outside": "(/test/environment/temperatures/current_area > (/test/environment/temperature/outdoors + 0.5) ? 1 : 0" \n')
+
+        setupTest('/test/environment/temperatures/is_cooler_outside', '0', done)
+
+        const context = {
+            '/test/environment/temperatures/current_area': '20',
+        }
+        global.changeProcessor([rule], generateContext(context), '/test/environment/temperature/outdoors', '25')
+    }).timeout(500)
+
+    it('test averaging numbers float', function(done) {
+        const rule = generateRule(
+            'sleeping_area_temperature_calculator: \n\
+            watch: \n\
+              devices: ["/test/environment/thermostat/temperature/bedroom", "/test/environment/thermostat/temperature/guest_bedroom"] \n\
+            actions: \n\
+              "/test/environment/temperatures/sleeping_area": "(/test/environment/thermostat/temperature/bedroom + /test/environment/thermostat/temperature/guest_bedroom) / 2"')
+
+        setupTest('/test/environment/temperatures/sleeping_area', '12.5', done)
+
+        const context = {
+            '/test/environment/thermostat/temperature/bedroom': '15',
+        }
+        global.changeProcessor([rule], generateContext(context), '/test/environment/thermostat/temperature/guest_bedroom', '10')
+    }).timeout(500)
+
+    it('test averaging numbers integer', function(done) {
+        const rule = generateRule(
+            'sleeping_area_temperature_calculator: \n\
+            watch: \n\
+              devices: ["/test/environment/thermostat/temperature/bedroom", "/test/environment/thermostat/temperature/guest_bedroom"] \n\
+            actions: \n\
+              "/test/environment/temperatures/sleeping_area": "(/test/environment/thermostat/temperature/bedroom + /test/environment/thermostat/temperature/guest_bedroom) / 2"')
+
+        setupTest('/test/environment/temperatures/sleeping_area', '15', done)
+
+        const context = {
+            '/test/environment/thermostat/temperature/bedroom': '20',
+        }
+        global.changeProcessor([rule], generateContext(context), '/test/environment/thermostat/temperature/guest_bedroom', '10')
     }).timeout(500)
 
 
@@ -154,27 +218,19 @@ describe('quick trigger tests', function() {
         global.changeProcessor([rule], generateContext(context), '/test/presence/geofence/home/elene', '0')
     }).timeout(500)
 
-    it('delayed evaluate of 1s', function(done) {
-        // guest_bathroom_motion_off:
-        //     evaluate_after: 1200
-        //     watch:
-        //       devices: ["/guest_bathroom/motion"]
-        //     rules:
-        //       expression: "/guest_bathroom/motion == 0"
-        //     actions:
-        //       "/zones/guest_bathroom": "0"
-        done()
-    }).timeout(500)
-
     it('simple evaluate, string result', function(done) {
-        // harmony_off_when_mode_changes:
-        //     watch:
-        //       devices: ["/home/mode"]
-        //     rules:
-        //       expression: "(/home/mode == 1) || (/home/mode == 2)"
-        //     actions:
-        //       "/livingroom/harmony/set": "off"
-        done()
+        const rule = generateRule(
+            'test_harmony_off_when_mode_changes:\n\
+            watch:\n\
+              devices: ["/test/home/mode"]\n\
+            rules:\n\
+              expression: "(/test/home/mode == 1) || (/test/home/mode == 2)"\n\
+            actions:\n\
+              "/test/livingroom/harmony/set": "off"\n')
+
+        setupTest('/test/livingroom/harmony/set', 'off', done)
+
+        global.changeProcessor([rule], {}, '/test/home/mode', '1')
     }).timeout(500)
 
     it('test simple value during a time', function(done) {
@@ -251,10 +307,27 @@ describe('delay tests', function() {
         "/test/lights/set": "0" ')
 
         setupTest('/test/lights/set', '1', function() {
-            setupTest('/test/lights/set', '0', done)
+            setupTest('/test/lights/set', '0', done, 1)
         })
 
         global.changeProcessor([rule], {}, '/test/motion', '1')
     }).timeout(3000)
+
+    it('delayed evaluate of 2s', function(done) {
+        this.slow(2200)
+        const rule = generateRule(
+            'test_guest_bathroom_motion_off: \n\
+            evaluate_after: 2 \n\
+            watch: \n\
+              devices: ["/test/guest_bathroom/motion"] \n\
+            rules: \n\
+              expression: "/test/guest_bathroom/motion == 0" \n\
+            actions: \n\
+              "/test/zones/guest_bathroom": "0" \n')
+
+        setupTest('/test/zones/guest_bathroom', '0', done, 2)
+
+        global.changeProcessor([rule], {}, '/test/guest_bathroom/motion', '0')
+    }).timeout(4000)
 
 })
