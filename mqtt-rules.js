@@ -5,7 +5,9 @@ var async = require('async')
 const _ = require('lodash')
 var is_test_mode = process.env.TEST_MODE
 
-if (is_test_mode != true) {
+if (is_test_mode == 'true') {
+    is_test_mode = true
+} else if (is_test_mode != true) {
     is_test_mode = false
 }
 
@@ -175,7 +177,7 @@ global.redis = Redis.setupClient(function() {
     logging.info('redis connected ', {
         action: 'redis-connected'
     })
-
+    console.log('is_test_mode: ' + is_test_mode)
     if (is_test_mode == false) {
         logging.info('loading rules')
         rules.load_path(config_path)

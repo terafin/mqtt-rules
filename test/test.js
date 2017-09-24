@@ -100,20 +100,22 @@ describe('quick trigger tests', function() {
 
 
     it('test home mode (or)', function(done) {
-        // become_home_mode:
-        //   rules:
-        //     expression: "(/presence/geofence/home/justin == 1 || /presence/geofence/home/elene == 1) && (/home/mode == 1 || /home/mode == 3)"
-        //   watch:
-        //     devices: ["/presence/geofence/home/justin", "/presence/geofence/home/elene"]
-        //   notify:
-        //     message: "Someone arrived home, becoming home mode"
-        //     title: "Welcome Home!"
-        //   actions:
-        //     "/home/mode": "0"
-        done()
+        const rule = generateRule(
+            'test_nobody_home_mode: \n\
+          rules: \n\
+            expression: "(/test/presence/geofence/home/justin == 1 || /test/presence/geofence/home/elene == 1) && (/test/home/mode != 0 || /test/home/mode == 2)" \n\
+          watch: \n\
+            devices: ["/test/presence/geofence/home/justin", "/test/presence/geofence/home/elene"] \n\
+          actions: \n\
+            "/test/home/mode": "1"')
+        setupTest('/test/home/mode', '0', done)
+
+        global.changeProcessor([rule], {}, '/test/presence/geofence/home/mode', '1')
+        global.changeProcessor([rule], {}, '/test/presence/geofence/home/justin', '1')
+        global.changeProcessor([rule], {}, '/test/presence/geofence/home/elene', '0')
     }).timeout(500)
 
-    it('test away mode (or)', function(done) {
+    it('test away mode (and)', function(done) {
         const rule = generateRule(
             'test_nobody_home_mode: \n\
           rules: \n\
