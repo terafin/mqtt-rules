@@ -1,4 +1,5 @@
 const _ = require('lodash')
+const utilities = require('../lib/utilities.js')
 
 const yaml = require('js-yaml')
 
@@ -19,6 +20,15 @@ var setupTest = function(topic, message, callback) {
 
 var generateRule = function(ruleString) {
     return yaml.safeLoad(ruleString)
+}
+var generateContext = function(inContext) {
+    var outContext = {}
+
+    Object.keys(inContext).forEach(function(key) {
+        outContext[utilities.update_topic_for_expression(key)] = inContext[key]
+    }, this)
+
+    return outContext
 }
 
 global.client.on('message', (topic, message) => {
@@ -118,7 +128,7 @@ describe('quick trigger tests', function() {
             '/test/home/mode': '1',
             '/test/presence/geofence/home/justin': '0'
         }
-        global.changeProcessor([rule], context, '/test/presence/geofence/home/elene', '1')
+        global.changeProcessor([rule], generateContext(context), '/test/presence/geofence/home/elene', '1')
     }).timeout(500)
 
     it('test away mode (and)', function(done) {
@@ -131,16 +141,15 @@ describe('quick trigger tests', function() {
           actions: \n\
             "/test/home/mode": "1"')
 
-
         setupTest('/test/home/mode', '1', done)
 
         const context = {
             '/test/home/mode': '0',
             '/test/presence/geofence/home/justin': '0',
             '/test/presence/geofence/home/elene': '1'
-
         }
-        global.changeProcessor([rule], context, '/test/presence/geofence/home/elene', '0')
+
+        global.changeProcessor([rule], generateContext(context), '/test/presence/geofence/home/elene', '0')
     }).timeout(500)
 
     it('delayed evaluate of 1s', function(done) {
