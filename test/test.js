@@ -225,7 +225,7 @@ describe('delay tests', function() {
         global.clearQueues()
     })
 
-    this.slow(1500)
+    this.slow(1200)
 
     it('test connection to mqtt', function(done) {
         if (global.client.connected == true) {
