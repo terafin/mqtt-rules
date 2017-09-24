@@ -34,8 +34,10 @@ var generateContext = function(inContext) {
 global.client.on('message', (topic, message) => {
     if (topic.startsWith('happy'))
         return
-    console.log('incoming: ' + topic + ':' + message)
-    console.log('  looking for: ' + targetTestTopic + ':' + targetTestMessage)
+
+    // console.log('incoming: ' + topic + ':' + message)
+    // console.log('  looking for: ' + targetTestTopic + ':' + targetTestMessage)
+
     if (topic == targetTestTopic &&
         message == targetTestMessage) {
         if (!_.isNull(targetCallback)) {
