@@ -11,17 +11,26 @@ var targetTestTopic = null
 var targetTestMessage = null
 var targetCallback = null
 var targetEarliestDate = null
+var targetStartDate = null
 
+var clearState = function() {
+    targetTestTopic = null
+    targetTestMessage = null
+    targetCallback = null
+    targetEarliestDate = null
+    targetStartDate = null
+}
 
 var setupTest = function(topic, message, callback, minimumTime) {
+    clearState()
+
     targetTestTopic = topic
     targetTestMessage = message
     targetCallback = callback
     if (!_.isNil(minimumTime) && minimumTime > 0) {
         targetEarliestDate = new Date(new Date().getTime() + (minimumTime * 1000))
+        targetStartDate = new Date().getTime()
             // console.log('minimum fire date: ' + targetEarliestDate)
-    } else {
-        targetEarliestDate = null
     }
 }
 
@@ -48,22 +57,31 @@ global.client.on('message', (topic, message) => {
     if (topic == targetTestTopic &&
         message == targetTestMessage) {
         if (!_.isNull(targetCallback)) {
+            // console.log('incoming: ' + topic + ' : ' + message + '   (time: ' + (new Date().getTime()) / 1000 + ')')
             var tooEarly = false
+            var howEarly = 0
+            var desiredMinimum = 0
             if (targetEarliestDate != null) {
                 const now = new Date()
                     // console.log('minimum fire date: ' + targetEarliestDate + '   now: ' + now)
-                if (now < targetEarliestDate) {
+
+                // Fudge half a second, as sometimes timers early fire a little bit...
+                if (now + 0.5 < targetEarliestDate) {
                     tooEarly = true
+                    howEarly = targetEarliestDate - now
+                    desiredMinimum = (targetEarliestDate - targetStartDate) / 1000
                 }
             }
             var oldCallBack = targetCallback
+
+            clearState()
+
             setTimeout(function cb() {
                 if (tooEarly)
-                    oldCallBack('test finished too early')
+                    oldCallBack('test finished too early (' + howEarly + 's vs ' + desiredMinimum + 's)')
                 else
                     oldCallBack()
             })
-            targetCallback = null
         }
     }
 })
@@ -294,7 +312,8 @@ describe('delay tests', function() {
     })
 
 
-    it('test motion should trigger light on, then off', function(done) {
+    it('test motion should trigger light on, then off 10s later', function(done) {
+        this.slow(11000)
         const rule = generateRule(
             'some_bathroom_lights_motion: \n\
     watch: \n\
@@ -302,16 +321,41 @@ describe('delay tests', function() {
     actions: \n\
       "/test/lights/set": "/test/motion" \n\
     delayed_actions: \n\
-      delay: 1 \n\
+      delay: 10 \n\
       actions: \n\
         "/test/lights/set": "0" ')
 
         setupTest('/test/lights/set', '1', function() {
-            setupTest('/test/lights/set', '0', done, 1)
+            setupTest('/test/lights/set', '0', done, 10)
         })
 
         global.changeProcessor([rule], {}, '/test/motion', '1')
-    }).timeout(3000)
+    }).timeout(12000)
+
+    it('test motion should trigger light on, motion again 5s later, then off 10s later', function(done) {
+        this.slow(16000)
+        const rule = generateRule(
+            'some_bathroom_lights_motion: \n\
+    watch: \n\
+      devices: ["/test/motion"] \n\
+    actions: \n\
+      "/test/lights/set": "/test/motion" \n\
+    delayed_actions: \n\
+      delay: 10 \n\
+      actions: \n\
+        "/test/lights/set": "0" ')
+
+        setupTest('/test/lights/set', '1', function() {
+            setupTest('/test/lights/set', '0', done, 15)
+        })
+
+        global.changeProcessor([rule], {}, '/test/motion', '1')
+
+        setTimeout(function() {
+            global.changeProcessor([rule], {}, '/test/motion', '1')
+        }, 5000)
+
+    }).timeout(17000)
 
     it('delayed evaluate of 2s', function(done) {
         this.slow(2200)
