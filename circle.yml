@@ -8,26 +8,8 @@ dependencies:
     - docker build --rm=false -t $DOCKER_REPO .
 
 test:
-    steps:
-      - checkout
-      - run: npm install
-      - run: mkdir ~/junit
-      - run:
-          command: mocha test --reporter mocha-junit-reporter
-          environment:
-          - TEST_MODE: true
-          - LOCATION_LAT: 37.38237
-          - LOCATION_LONG: -122.1186046
-          - MQTT_HOST: 0.0.0.0
-          - REDIS_PORT: 0.0.0.0
-          - REDIS_PORT: 0
-          - REDIS_DATABASE: 0
-            MOCHA_FILE: junit/test-results.xml
-          when: always
-      - store_test_results:
-          path: ~/junit
-      - store_artifacts:
-          path: ~/junit
+  override:
+    - echo "Empty test for $DOCKER_REPO"
 
 deployment:
   hub:
