@@ -9,7 +9,7 @@ dependencies:
 
 test:
   override:
-    - mocha ./test
+    - ./node_modules/mocha/bin/_mocha ./test
   environment:
     - TEST_MODE: true
     - LOCATION_LAT: 37.38237
