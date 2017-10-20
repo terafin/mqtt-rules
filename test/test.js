@@ -47,7 +47,7 @@ var generateContext = function(inContext) {
     return outContext
 }
 
-global.client.on('message', (topic, message) => {
+global.publish = function(rule_name, expression, valueOrExpression, topic, message) {
     if (topic.startsWith('happy'))
         return
 
@@ -57,7 +57,7 @@ global.client.on('message', (topic, message) => {
     if (topic == targetTestTopic &&
         message == targetTestMessage) {
         if (!_.isNull(targetCallback)) {
-            // console.log('incoming: ' + topic + ' : ' + message + '   (time: ' + (new Date().getTime()) / 1000 + ')')
+            console.log('incoming: ' + topic + ' : ' + message + '   (time: ' + (new Date().getTime()) / 1000 + ')')
             var tooEarly = false
             var howEarly = 0
             var desiredMinimum = 0
@@ -84,7 +84,7 @@ global.client.on('message', (topic, message) => {
             })
         }
     }
-})
+}
 
 describe('quick trigger tests', function() {
     before(function() {
@@ -93,16 +93,6 @@ describe('quick trigger tests', function() {
     })
 
     this.slow(100)
-
-    it('test connection to mqtt', function(done) {
-        if (global.client.connected == true) {
-            done()
-        } else {
-            global.client.on('connect', function() {
-                done()
-            })
-        }
-    })
 
     it('test motion should trigger light on', function(done) {
         const rule = generateRule(
@@ -300,17 +290,6 @@ describe('delay tests', function() {
     })
 
     this.slow(1200)
-
-    it('test connection to mqtt', function(done) {
-        if (global.client.connected == true) {
-            done()
-        } else {
-            global.client.on('connect', function() {
-                done()
-            })
-        }
-    })
-
 
     it('test motion should trigger light on, then off 10s later', function(done) {
         this.slow(11000)
