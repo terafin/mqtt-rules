@@ -1,4 +1,3 @@
-const _ = require('lodash')
 const utilities = require('../lib/utilities.js')
 
 const yaml = require('js-yaml')
@@ -27,7 +26,7 @@ var setupTest = function(topic, message, callback, minimumTime) {
     targetTestTopic = topic
     targetTestMessage = message
     targetCallback = callback
-    if (!_.isNil(minimumTime) && minimumTime > 0) {
+    if ((minimumTime != null) && minimumTime > 0) {
         targetEarliestDate = new Date(new Date().getTime() + (minimumTime * 1000))
         targetStartDate = new Date().getTime()
             // console.log('minimum fire date: ' + targetEarliestDate)
@@ -56,7 +55,7 @@ global.publish = function(rule_name, expression, valueOrExpression, topic, messa
 
     if (topic == targetTestTopic &&
         message == targetTestMessage) {
-        if (!_.isNull(targetCallback)) {
+        if ((targetCallback != null)) {
             console.log('incoming: ' + topic + ' : ' + message + '   (time: ' + (new Date().getTime()) / 1000 + ')')
             var tooEarly = false
             var howEarly = 0
