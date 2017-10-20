@@ -9,7 +9,15 @@ dependencies:
 
 test:
   override:
-    - echo "Empty test for $DOCKER_REPO"
+    - mocha ./test
+  environment:
+    - TEST_MODE: true
+    - LOCATION_LAT: 37.38237
+    - LOCATION_LONG: -122.1186046
+    - MQTT_HOST: 0.0.0.0
+    - REDIS_PORT: 0.0.0.0
+    - REDIS_PORT: 0
+    - REDIS_DATABASE: 0
 
 deployment:
   hub:

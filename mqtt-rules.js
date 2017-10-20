@@ -76,9 +76,9 @@ global.changeProcessor = function(rules, context, topic, message) {
     var ruleProcessor = function(rule, rule_name, callback) {
         //logging.debug('rule processor for rule: ' + rule_name)
         const disabled = rule.disabled
-        
-        if ( disabled == true ) return
-        
+
+        if (disabled == true) return
+
         const watch = rule.watch
 
         if (!_.isNil(watch) && !_.isNil(watch.devices)) {
