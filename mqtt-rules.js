@@ -21,6 +21,7 @@ require('./homeautomation-js-lib/redis_helpers.js')
 const utilities = require('./lib/utilities.js')
 const schedule = require('./lib/scheduled-jobs.js')
 const evaluation = require('./lib/evaluation.js')
+const metrics = require('./homeautomation-js-lib/stats.js')
 
 const config_path = process.env.TRANSFORM_CONFIG_PATH
 
@@ -42,22 +43,9 @@ global.publishEvents = []
 global.publish = function(rule_name, expression, valueOrExpression, topic, message) {
     logging.info('=> rule: ' + rule_name + '  publishing: ' + topic + ':' + message + ' (expression: ' + expression + ' | value: ' + valueOrExpression + ')')
     global.client.publish(topic, message)
-        // var event = {}
-
-    // event.rule_name = rule_name
-    // event.expression = expression
-    // event.valueOrExpression = valueOrExpression
-    // event.topic = topic
-    // event.message = message
-    // event.date = new Date()
-
-    // global.publishEvents.push(event)
 }
 
 global.devices_to_monitor = []
-
-//var global_value_cache = {}
-
 
 global.changeProcessor = function(rules, context, topic, message) {
     context[utilities.update_topic_for_expression(topic)] = message
@@ -68,13 +56,7 @@ global.changeProcessor = function(rules, context, topic, message) {
         start_time: ruleStartTime
     })
 
-    // logging.info('  topic: ' + topic)
-    // logging.info('message: ' + message)
-    // logging.info('  rules: ' + JSON.stringify(rules))
-    // logging.info('context: ' + JSON.stringify(context))
-
     var ruleProcessor = function(rule, rule_name, callback) {
-        //logging.debug('rule processor for rule: ' + rule_name)
         const disabled = rule.disabled
 
         if (disabled == true) return
@@ -122,23 +104,6 @@ global.client.on('message', (topic, message) => {
         return
 
     message = utilities.convertToNumberIfNeeded(message)
-
-    // logging.info(' ' + topic + ':' + message)
-    // var cachedValue = global_value_cache[topic]
-
-    // if (!_.isNil(cachedValue)) {
-    //     if (('' + message).localeCompare(cachedValue) === 0) {
-    //         logging.info(' => value not updated', {
-    //             action: 'skipped-processing',
-    //             reason: 'value-not-updated',
-    //             topic: topic,
-    //             message: message
-    //         })
-    //         return
-    //     }
-    // }
-    // global_value_cache[topic] = message
-
     const redisStartTime = new Date().getTime()
     logging.verbose(' redis query', {
         action: 'redis-query-start',
@@ -146,10 +111,14 @@ global.client.on('message', (topic, message) => {
     })
 
     global.redis.mget(global.devices_to_monitor, function(err, values) {
+        const redisQueryTime = ((new Date().getTime()) - redisStartTime)
         logging.verbose(' redis query done', {
             action: 'redis-query-done',
-            query_time: ((new Date().getTime()) - redisStartTime)
+            query_time: redisQueryTime
         })
+
+        metrics.submit('redis_query_time', redisQueryTime)
+
         var context = {}
 
         for (var index = 0; index < global.devices_to_monitor.length; index++) {
