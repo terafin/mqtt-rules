@@ -26,18 +26,19 @@ const metrics = require('./homeautomation-js-lib/stats.js')
 const config_path = process.env.TRANSFORM_CONFIG_PATH
 
 // Setup MQTT
-global.client = mqtt.setupClient(function() {
-    logging.info('MQTT Connected', {
-        action: 'mqtt-connected'
-    })
-    global.client.subscribe('#')
+if (is_test_mode === false) {
+    global.client = mqtt.setupClient(function() {
+        logging.info('MQTT Connected', {
+            action: 'mqtt-connected'
+        })
+        global.client.subscribe('#')
 
-}, function() {
-    logging.error('Disconnected', {
-        action: 'mqtt-disconnected'
+    }, function() {
+        logging.error('Disconnected', {
+            action: 'mqtt-disconnected'
+        })
     })
-})
-
+}
 global.publishEvents = []
 
 global.publish = function(rule_name, expression, valueOrExpression, topic, message) {
@@ -96,56 +97,57 @@ global.changeProcessor = function(rules, context, topic, message) {
 }
 
 
-global.client.on('message', (topic, message) => {
-    if (is_test_mode == true)
-        return
+if (is_test_mode === false) {
+    global.client.on('message', (topic, message) => {
+        if (is_test_mode == true)
+            return
 
-    if (!global.devices_to_monitor.includes(topic))
-        return
+        if (!global.devices_to_monitor.includes(topic))
+            return
 
-    message = utilities.convertToNumberIfNeeded(message)
-    const redisStartTime = new Date().getTime()
-    logging.verbose(' redis query', {
-        action: 'redis-query-start',
-        start_time: redisStartTime
-    })
-
-    global.redis.mget(global.devices_to_monitor, function(err, values) {
-        const redisQueryTime = ((new Date().getTime()) - redisStartTime)
-        logging.verbose(' redis query done', {
-            action: 'redis-query-done',
-            query_time: redisQueryTime
+        message = utilities.convertToNumberIfNeeded(message)
+        const redisStartTime = new Date().getTime()
+        logging.verbose(' redis query', {
+            action: 'redis-query-start',
+            start_time: redisStartTime
         })
 
-        metrics.submit('redis_query_time', redisQueryTime)
+        global.redis.mget(global.devices_to_monitor, function(err, values) {
+            const redisQueryTime = ((new Date().getTime()) - redisStartTime)
+            logging.verbose(' redis query done', {
+                action: 'redis-query-done',
+                query_time: redisQueryTime
+            })
 
-        var context = {}
+            metrics.submit('redis_query_time', redisQueryTime)
 
-        for (var index = 0; index < global.devices_to_monitor.length; index++) {
-            const key = global.devices_to_monitor[index]
-            const value = values[index]
-            const newKey = utilities.update_topic_for_expression(key)
-            if (key === topic)
-                context[newKey] = utilities.convertToNumberIfNeeded(message)
-            else
-                context[newKey] = utilities.convertToNumberIfNeeded(value)
-        }
+            var context = {}
 
-        try {
-            var jsonFound = JSON.parse(message)
-            if (!_.isNil(jsonFound)) {
-                Object.keys(jsonFound).forEach(function(key) {
-                    context[key] = jsonFound[key]
-                })
+            for (var index = 0; index < global.devices_to_monitor.length; index++) {
+                const key = global.devices_to_monitor[index]
+                const value = values[index]
+                const newKey = utilities.update_topic_for_expression(key)
+                if (key === topic)
+                    context[newKey] = utilities.convertToNumberIfNeeded(message)
+                else
+                    context[newKey] = utilities.convertToNumberIfNeeded(value)
             }
-        } catch (err) {
-            logging.debug('invalid json')
-        }
 
-        global.changeProcessor(rules.get_configs(), context, topic, message)
+            try {
+                var jsonFound = JSON.parse(message)
+                if (!_.isNil(jsonFound)) {
+                    Object.keys(jsonFound).forEach(function(key) {
+                        context[key] = jsonFound[key]
+                    })
+                }
+            } catch (err) {
+                logging.debug('invalid json')
+            }
+
+            global.changeProcessor(rules.get_configs(), context, topic, message)
+        })
     })
-})
-
+}
 global.redis = Redis.setupClient(function() {
     logging.info('redis connected ', {
         action: 'redis-connected'
