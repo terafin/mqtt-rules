@@ -365,7 +365,11 @@ describe('time based triggers', function() {
 
     this.slow(1200)
 
-    it('test if a trigger can fire in 15 seconds', function(done) {
+    it('test if a trigger can fire at sunset', function(done) {
+        done()
+    }).timeout(60000)
+
+    it('test if a trigger can fire inside a minute', function(done) {
         this.slow(16000)
         const rule = generateRule('\
             test_timed_rule: \n\
@@ -378,6 +382,5 @@ describe('time based triggers', function() {
         setupTest('/test/timer/fired', '1', done, 1)
 
     }).timeout(60000)
-
 
 })
