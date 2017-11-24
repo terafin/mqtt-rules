@@ -1,4 +1,6 @@
 const utilities = require('../lib/utilities.js')
+const TIMEZONE = utilities.getCurrentTimeZone()
+console.log('Running in timezone: ' + TIMEZONE)
 
 process.env.TEST_MODE = true
 
