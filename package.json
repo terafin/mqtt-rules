@@ -17,6 +17,7 @@
         "chai": "^4.1.1",
         "express": "^4.15.3",
         "graphite": "0.0.7",
+        "homeautomation-js-lib": "git://github.com/terafin/homeautomation-js-lib.git",
         "jexl": "^1.1.4",
         "js-yaml": "^3.8.3",
         "lodash": "^4.17.4",
@@ -26,12 +27,7 @@
         "node-schedule-tz": "^1.2.1-4",
         "pushover-notifications": "^0.2.4",
         "redis": "^2.7.1",
-        "request": "^2.81.0",
-        "suncalc": "^1.8.0",
-        "url": "^0.11.0",
-        "watch": "^1.0.2",
-        "winston": "^2.3.1",
-        "winston-splunk-httplogger": "^1.2.2"
+        "suncalc": "^1.8.0"
     },
     "engines": {
         "node": ">=4"
