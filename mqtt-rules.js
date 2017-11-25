@@ -11,17 +11,18 @@ if (is_test_mode == 'true') {
     is_test_mode = false
 }
 
-const rules = require('./homeautomation-js-lib/rules.js')
-const logging = require('./homeautomation-js-lib/logging.js')
+const rules = require('homeautomation-js-lib/rules.js')
+const logging = require('homeautomation-js-lib/logging.js')
 
-require('./homeautomation-js-lib/devices.js')
-require('./homeautomation-js-lib/mqtt_helpers.js')
-require('./homeautomation-js-lib/redis_helpers.js')
+require('homeautomation-js-lib/devices.js')
+require('homeautomation-js-lib/mqtt_helpers.js')
+require('homeautomation-js-lib/redis_helpers.js')
 
+const api = require('./lib/api.js')
 const utilities = require('./lib/utilities.js')
 const schedule = require('./lib/scheduled-jobs.js')
 const evaluation = require('./lib/evaluation.js')
-const metrics = require('./homeautomation-js-lib/stats.js')
+const metrics = require('homeautomation-js-lib/stats.js')
 
 const config_path = process.env.TRANSFORM_CONFIG_PATH
 
@@ -227,6 +228,7 @@ rules.on('rules-loaded', () => {
     })
 
     schedule.scheduleJobs()
+    api.updateRules(rules)
 })
 
 global.clearQueues = function() {
