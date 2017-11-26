@@ -126,6 +126,7 @@ if (is_test_mode === false) {
 
             for (var index = 0; index < global.devices_to_monitor.length; index++) {
                 const key = global.devices_to_monitor[index]
+                    // bug here with index
                 const value = values[index]
                 const newKey = utilities.update_topic_for_expression(key)
                 if (key === topic)
