@@ -49,7 +49,7 @@ var generateContext = function(inContext) {
     return outContext
 }
 
-global.publish = function(rule_name, expression, valueOrExpression, topic, message) {
+global.publish = function(rule_name, expression, valueOrExpression, topic, message, options) {
     if (topic.startsWith('happy'))
         return
 
