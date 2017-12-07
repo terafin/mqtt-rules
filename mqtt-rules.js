@@ -44,7 +44,7 @@ global.publishEvents = []
 
 global.publish = function(rule_name, expression, valueOrExpression, topic, message, inOptions) {
     logging.info('=> rule: ' + rule_name + '  publishing: ' + topic + ':' + message + ' (expression: ' + expression + ' | value: ' + valueOrExpression + ')' + '  options: ' + JSON.stringify(inOptions))
-    var options = { retain: true }
+    var options = { retain: false }
 
     if (!_.isNil(inOptions)) {
         Object.keys(inOptions).forEach(function(key) {
