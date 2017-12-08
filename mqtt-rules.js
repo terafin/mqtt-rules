@@ -61,7 +61,7 @@ global.changeProcessor = function(rules, context, topic, message) {
     context[utilities.update_topic_for_expression(topic)] = message
 
     const ruleStartTime = new Date().getTime()
-    logging.verbose(' rule processing start ', {
+    logging.debug(' rule processing start ', {
         action: 'rule-processing-start',
         start_time: ruleStartTime
     })
@@ -76,7 +76,7 @@ global.changeProcessor = function(rules, context, topic, message) {
         if (!_.isNil(watch) && !_.isNil(watch.devices)) {
             if (watch.devices.indexOf(topic) !== -1) {
 
-                logging.verbose('matched topic to rule', {
+                logging.debug('matched topic to rule', {
                     action: 'rule-match',
                     rule_name: rule_name,
                     topic: topic,
@@ -99,7 +99,7 @@ global.changeProcessor = function(rules, context, topic, message) {
 
     async.each(rules, configProcessor)
 
-    logging.verbose(' rule processing done ', {
+    logging.debug(' rule processing done ', {
         action: 'rule-processing-done',
         processing_time: ((new Date().getTime()) - ruleStartTime)
     })
@@ -116,14 +116,14 @@ if (is_test_mode === false) {
 
         message = utilities.convertToNumberIfNeeded(message)
         const redisStartTime = new Date().getTime()
-        logging.verbose(' redis query', {
+        logging.debug(' redis query', {
             action: 'redis-query-start',
             start_time: redisStartTime
         })
 
         global.redis.mget(global.devices_to_monitor, function(err, values) {
             const redisQueryTime = ((new Date().getTime()) - redisStartTime)
-            logging.verbose(' redis query done', {
+            logging.debug(' redis query done', {
                 action: 'redis-query-done',
                 query_time: redisQueryTime
             })
