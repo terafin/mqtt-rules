@@ -11,6 +11,8 @@ if (is_test_mode == 'true') {
     is_test_mode = false
 }
 
+global.test_mode = is_test_mode
+
 const rules = require('homeautomation-js-lib/rules.js')
 const logging = require('homeautomation-js-lib/logging.js')
 

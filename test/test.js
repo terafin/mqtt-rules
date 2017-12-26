@@ -59,7 +59,7 @@ global.publish = function(rule_name, expression, valueOrExpression, topic, messa
     if (topic == targetTestTopic &&
         message == targetTestMessage) {
         if ((targetCallback != null)) {
-            console.log('incoming: ' + topic + ' : ' + message + '   (time: ' + (new Date().getTime()) / 1000 + ')')
+            // console.log('incoming: ' + topic + ' : ' + message + '   (time: ' + (new Date().getTime()) / 1000 + ')')
             var tooEarly = false
             var howEarly = 0
             var desiredMinimum = 0
@@ -115,6 +115,23 @@ describe('quick trigger tests', function() {
             'some_bathroom_lights_motion: \n\
     watch: \n\
       devices: ["/test/motion"] \n\
+    actions: \n\
+      "/test/lights/set": "/test/motion" \n\
+    ')
+        setupTest('/test/lights/set', '0', done)
+
+        global.changeProcessor([rule], {}, '/test/motion', '0')
+    }).timeout(500)
+
+    it('testing compound if expressions', function(done) {
+        const rule = generateRule(
+            'some_compound_if_expression: \n\
+    watch: \n\
+      devices: ["/test/motion"] \n\
+    expression: \n\
+      if: \n\
+        rule1: "/test/motion == 1"\n\
+        rule2: "/test/motion == 0"\n\
     actions: \n\
       "/test/lights/set": "/test/motion" \n\
     ')
@@ -291,10 +308,10 @@ describe('delay tests', function() {
         global.clearQueues()
     })
 
-    this.slow(1200)
+    this.slow(10500)
 
     it('test motion should trigger light on, then off 10s later', function(done) {
-        this.slow(11000)
+        this.slow(10500)
         const rule = generateRule(
             'some_bathroom_lights_motion: \n\
     watch: \n\
@@ -374,13 +391,13 @@ describe('time based triggers', function() {
         const rule = generateRule('\
             test_timed_rule: \n\
             schedule: \n\
-              soon: "* * * * * *" \n\
+              soon: "*/2 * * * * *" \n\
             actions: \n\
               "/test/timer/fired": "1" \n\
             ')
-        jobscheduler.scheduleJob('test_timed_rule', 'test_timed_rule', '* * * * *', rule)
+        jobscheduler.scheduleJob('test_timed_rule', 'test_timed_rule', '*/2 * * * * *', rule)
         setupTest('/test/timer/fired', '1', done, 1)
 
-    }).timeout(60000)
+    }).timeout(5000)
 
 })
