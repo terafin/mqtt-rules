@@ -23,7 +23,7 @@
         "lodash": "^4.17.4",
         "mocha": "^3.5.0",
         "moment-timezone": "^0.5.13",
-        "mqtt": "^2.6.2",
+        "mqtt": "^2.15.0",
         "node-schedule-tz": "^1.2.1-4",
         "pushover-notifications": "^0.2.4",
         "redis": "^2.7.1",
