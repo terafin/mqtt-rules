@@ -107,59 +107,65 @@ global.changeProcessor = function(rules, context, topic, message) {
     })
 }
 
+global.generateContext = function(topic, inMessage, callback) {
+    if ( _.isNil(callback)) 
+        return
+    
+    var message = utilities.convertToNumberIfNeeded(inMessage)
+    const redisStartTime = new Date().getTime()
+    logging.debug(' redis query', {
+        action: 'redis-query-start',
+        start_time: redisStartTime
+    })
+
+    global.redis.mget(global.devices_to_monitor, function(err, values) {
+        const redisQueryTime = ((new Date().getTime()) - redisStartTime)
+        logging.debug(' redis query done', {
+            action: 'redis-query-done',
+            query_time: redisQueryTime
+        })
+
+        metrics.submit('redis_query_time', redisQueryTime)
+
+        var context = {}
+
+        for (var index = 0; index < global.devices_to_monitor.length; index++) {
+            const key = global.devices_to_monitor[index]
+                // bug here with index
+            const value = values[index]
+            const newKey = utilities.update_topic_for_expression(key)
+            if (key === topic)
+                context[newKey] = utilities.convertToNumberIfNeeded(message)
+            else
+                context[newKey] = utilities.convertToNumberIfNeeded(value)
+        }
+
+        try {
+            var jsonFound = JSON.parse(message)
+            if (!_.isNil(jsonFound)) {
+                Object.keys(jsonFound).forEach(function(key) {
+                    context[key] = jsonFound[key]
+                })
+            }
+        } catch (err) {
+            logging.debug('invalid json')
+        }
+
+        callback(topic, message, context)
+    })
+}
 
 if (is_test_mode === false) {
     global.client.on('message', (topic, message) => {
-        if (is_test_mode == true)
-            return
-
         if (!global.devices_to_monitor.includes(topic))
             return
-
-        message = utilities.convertToNumberIfNeeded(message)
-        const redisStartTime = new Date().getTime()
-        logging.debug(' redis query', {
-            action: 'redis-query-start',
-            start_time: redisStartTime
-        })
-
-        global.redis.mget(global.devices_to_monitor, function(err, values) {
-            const redisQueryTime = ((new Date().getTime()) - redisStartTime)
-            logging.debug(' redis query done', {
-                action: 'redis-query-done',
-                query_time: redisQueryTime
-            })
-
-            metrics.submit('redis_query_time', redisQueryTime)
-
-            var context = {}
-
-            for (var index = 0; index < global.devices_to_monitor.length; index++) {
-                const key = global.devices_to_monitor[index]
-                    // bug here with index
-                const value = values[index]
-                const newKey = utilities.update_topic_for_expression(key)
-                if (key === topic)
-                    context[newKey] = utilities.convertToNumberIfNeeded(message)
-                else
-                    context[newKey] = utilities.convertToNumberIfNeeded(value)
-            }
-
-            try {
-                var jsonFound = JSON.parse(message)
-                if (!_.isNil(jsonFound)) {
-                    Object.keys(jsonFound).forEach(function(key) {
-                        context[key] = jsonFound[key]
-                    })
-                }
-            } catch (err) {
-                logging.debug('invalid json')
-            }
-
+        
+        global.generateContext(topic, message, function(outTopic, outMessage, context) {
             global.changeProcessor(rules.get_configs(), context, topic, message)
         })
     })
 }
+
 global.redis = Redis.setupClient(function() {
     logging.info('redis connected ', {
         action: 'redis-connected'
@@ -169,7 +175,6 @@ global.redis = Redis.setupClient(function() {
         rules.load_path(config_path)
     } else {
         logging.info('not - loading rules')
-
     }
 })
 
@@ -178,6 +183,7 @@ rules.on('rules-loaded', () => {
         logging.info('test mode, not loading rules')
         return
     }
+    
     logging.info('Loading rules')
 
     global.devices_to_monitor = []
