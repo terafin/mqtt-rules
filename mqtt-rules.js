@@ -87,7 +87,7 @@ global.changeProcessor = function(rules, context, topic, message) {
                     context: context
                 })
 
-                evaluation.evalulateValue(topic, context, rule_name, rule)
+                evaluation.evalulateValue(topic, context, rule_name, rule, false)
             }
         }
 
@@ -183,7 +183,7 @@ rules.on('rules-loaded', () => {
         logging.info('test mode, not loading rules')
         return
     }
-    
+
     logging.info('Loading rules')
 
     global.devices_to_monitor = []
