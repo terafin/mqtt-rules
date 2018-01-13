@@ -377,6 +377,7 @@ describe('delay tests', function() {
 describe('time based triggers', function() {
     before(function() {
         // runs before all tests in this block
+        global.setOverrideContext(null)
         global.clearQueues()
     })
 
@@ -400,4 +401,24 @@ describe('time based triggers', function() {
 
     }).timeout(5000)
 
+    it('test if a trigger can check values', function(done) {
+        this.slow(16000)
+        const rule = generateRule('\
+            test_timed_rule_with_value: \n\
+            schedule: \n\
+              soon: "*/2 * * * * *" \n\
+            actions: \n\
+              "/test/timer/print_value": "/test/timer/some_value" \n\
+            ')
+
+        const context = {
+            '/test/timer/some_value': '42',
+        }
+    
+        global.setOverrideContext(context)
+        jobscheduler.scheduleJob('test_timed_rule', 'test_timed_rule', '*/2 * * * * *', rule)
+        setupTest('/test/timer/print_value', '42', done, 1)
+
+    }).timeout(5000)
 })
+

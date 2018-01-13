@@ -11,8 +11,6 @@ if (is_test_mode == 'true') {
     is_test_mode = false
 }
 
-global.test_mode = is_test_mode
-
 const rules = require('homeautomation-js-lib/rules.js')
 const logging = require('homeautomation-js-lib/logging.js')
 
@@ -69,6 +67,10 @@ global.changeProcessor = function(rules, context, topic, message) {
     })
 
     var ruleProcessor = function(rule, rule_name, callback) {
+        if ( _.isNil(rule) ) {
+            logging.error('empty rule passed, with name: ' + rule_name)
+            return
+        }
         const disabled = rule.disabled
 
         if (disabled == true) return
@@ -107,6 +109,11 @@ global.changeProcessor = function(rules, context, topic, message) {
     })
 }
 
+var overrideContext = null
+global.setOverrideContext = function(inContext) {
+    overrideContext = inContext
+}
+
 global.generateContext = function(topic, inMessage, callback) {
     if ( _.isNil(callback)) 
         return
@@ -118,7 +125,17 @@ global.generateContext = function(topic, inMessage, callback) {
         start_time: redisStartTime
     })
 
-    global.redis.mget(global.devices_to_monitor, function(err, values) {
+    var devices_to_monitor = global.devices_to_monitor
+
+    if ( !_.isNil(overrideContext) ) {
+        devices_to_monitor = Object.keys(overrideContext)
+        logging.info('generating context from override: ' + JSON.stringify(overrideContext))
+    } else if ( is_test_mode == true ) {
+        callback(topic, message, {})
+        return
+    }
+
+    const processResults = function(err, values) {
         const redisQueryTime = ((new Date().getTime()) - redisStartTime)
         logging.debug(' redis query done', {
             action: 'redis-query-done',
@@ -129,8 +146,8 @@ global.generateContext = function(topic, inMessage, callback) {
 
         var context = {}
 
-        for (var index = 0; index < global.devices_to_monitor.length; index++) {
-            const key = global.devices_to_monitor[index]
+        for (var index = 0; index < devices_to_monitor.length; index++) {
+            const key = devices_to_monitor[index]
                 // bug here with index
             const value = values[index]
             const newKey = utilities.update_topic_for_expression(key)
@@ -151,8 +168,22 @@ global.generateContext = function(topic, inMessage, callback) {
             logging.debug('invalid json')
         }
 
+        if ( !_.isNil(overrideContext) ) {
+            logging.info('generated context from override: ' + JSON.stringify(context))
+            logging.info('             devices_to_monitor: ' + JSON.stringify(devices_to_monitor))
+        }
+    
         callback(topic, message, context)
-    })
+    }
+    
+    if ( _.isNil(overrideContext)) {
+        global.redis.mget(devices_to_monitor, processResults)
+    } else {
+        var keys = Object.keys(overrideContext)
+        var values = keys.map(function(v) { return overrideContext[v] })
+
+        processResults(null, values)
+    }
 }
 
 if (is_test_mode === false) {
