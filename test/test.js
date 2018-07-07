@@ -116,7 +116,7 @@ describe('quick trigger tests', function() {
     watch: \n\
       devices: ["/test/motion"] \n\
     actions: \n\
-      "/test/lights/set": "/test/motion" \n\
+      "/test/lights/set": "$TRIGGER_TOPIC" \n\
     ')
         setupTest('/test/lights/set', '0', done)
 
