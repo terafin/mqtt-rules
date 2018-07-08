@@ -17,6 +17,7 @@
         "chai": "^4.1.1",
         "express": "^4.15.3",
         "graphite": "0.0.7",
+        "mqtt-wildcard": "^3.0.9",
         "homeautomation-js-lib": "git://github.com/terafin/homeautomation-js-lib.git",
         "jexl": "^1.1.4",
         "js-yaml": "^3.8.3",

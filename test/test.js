@@ -100,7 +100,7 @@ describe('quick trigger tests', function() {
         const rule = generateRule(
             'some_bathroom_lights_motion: \n\
     watch: \n\
-      devices: ["/test/motion"] \n\
+      devices: ["/test/#"] \n\
     actions: \n\
       "/test/lights/set": "/test/motion" \n\
     ')

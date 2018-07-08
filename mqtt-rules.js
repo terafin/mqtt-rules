@@ -3,6 +3,7 @@ const mqtt = require('mqtt')
 var Redis = require('redis')
 var async = require('async')
 const _ = require('lodash')
+var mqtt_wildcard = require('mqtt-wildcard');
 var is_test_mode = process.env.TEST_MODE
 
 if (is_test_mode == 'true') {
@@ -78,8 +79,19 @@ global.changeProcessor = function(rules, context, topic, message) {
         const watch = rule.watch
 
         if (!_.isNil(watch) && !_.isNil(watch.devices)) {
-            if (watch.devices.indexOf(topic) !== -1) {
+            var foundMatch = null
 
+            watch.devices.forEach(deviceToWatch => {
+                if ( !_.isNil(foundMatch) ) return
+    
+                const match = mqtt_wildcard(topic, deviceToWatch)
+                if ( !_.isNil(match) ) {
+                    foundMatch = match
+                }
+             })
+    
+            
+            if ( !_.isNil(foundMatch) ) {
                 logging.debug('matched topic to rule', {
                     action: 'rule-match',
                     rule_name: rule_name,
@@ -126,6 +138,11 @@ global.generateContext = function(topic, inMessage, callback) {
     })
 
     var devices_to_monitor = global.devices_to_monitor
+
+    if ( !devices_to_monitor.includes(topic) ) {
+        logging.info('devices_to_monitor query missing: ' + topic)
+        devices_to_monitor.push(topic)
+    }
 
     if ( !_.isNil(overrideContext) ) {
         devices_to_monitor = Object.keys(overrideContext)
@@ -188,9 +205,23 @@ global.generateContext = function(topic, inMessage, callback) {
 
 if (is_test_mode === false) {
     global.client.on('message', (topic, message) => {
-        if (!global.devices_to_monitor.includes(topic))
-            return
+        var foundMatch = null
+        Object.keys(global.devices_to_monitor).forEach(deviceToMontor => {
+            if ( !_.isNil(foundMatch) ) return
+
+            const match = mqtt_wildcard(topic, deviceToMontor)
+            if ( !_.isNil(match) ) {
+                foundMatch = match
+            }
+         });
         
+        if ( _.isNil(foundMatch) ) {
+            logging.error('no matching device found')
+            return
+        } else {
+            logging.info(topic + ' matched with: ' + foundMatch)
+        }
+
         global.generateContext(topic, message, function(outTopic, outMessage, context) {
             global.changeProcessor(rules.get_configs(), context, topic, message)
         })
@@ -225,6 +256,7 @@ rules.on('rules-loaded', () => {
             const devices = watch.devices
             if (!_.isNil(devices)) {
                 devices.forEach(function(device) {
+                    // *** need to NOT add # and + devices
                     global.devices_to_monitor.push(device)
                 }, this)
             }
@@ -268,11 +300,6 @@ rules.on('rules-loaded', () => {
     logging.info('rules loaded ', {
         action: 'rules-loaded',
         devices_to_monitor: global.devices_to_monitor
-    })
-
-    global.redis.mget(global.devices_to_monitor, function(err, values) {
-        logging.debug('devices :' + JSON.stringify(global.devices_to_monitor))
-        logging.debug('values :' + JSON.stringify(values))
     })
 
     schedule.scheduleJobs()
