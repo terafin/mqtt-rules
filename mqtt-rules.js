@@ -206,7 +206,7 @@ global.generateContext = function(topic, inMessage, callback) {
 if (is_test_mode === false) {
     global.client.on('message', (topic, message) => {
         var foundMatch = null
-        Object.keys(global.devices_to_monitor).forEach(deviceToMontor => {
+        global.devices_to_monitor.forEach(deviceToMontor => {
             if ( !_.isNil(foundMatch) ) return
 
             const match = mqtt_wildcard(topic, deviceToMontor)
@@ -216,7 +216,7 @@ if (is_test_mode === false) {
          });
         
         if ( _.isNil(foundMatch) ) {
-            logging.error('no matching device found')
+            logging.error('no matching device found: ' + topic)
             return
         } else {
             logging.info(topic + ' matched with: ' + foundMatch)
