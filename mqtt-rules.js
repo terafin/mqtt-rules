@@ -216,7 +216,6 @@ if (is_test_mode === false) {
          });
         
         if ( _.isNil(foundMatch) ) {
-            logging.error('no matching device found: ' + topic)
             return
         } else {
             logging.info(topic + ' matched with: ' + foundMatch)
