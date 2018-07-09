@@ -152,8 +152,8 @@ global.generateContext = function(topic, inMessage, callback) {
 
     var devices_to_monitor = global.devices_to_monitor
 
-    if ( !devices_to_monitor.includes(topic) ) {
-        logging.info('devices_to_monitor query missing: ' + topic)
+    if ( !_.isNil(topic) && !devices_to_monitor.includes(topic) ) {
+        logging.debug('devices_to_monitor query missing: ' + topic)
         devices_to_monitor.push(topic)
     }
 
@@ -315,7 +315,7 @@ rules.on('rules-loaded', () => {
     })
 
     handleSubscriptions()
-    
+
     schedule.scheduleJobs()
     api.updateRules(rules)
 })
