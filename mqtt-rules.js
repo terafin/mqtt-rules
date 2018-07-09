@@ -27,14 +27,27 @@ const metrics = require('homeautomation-js-lib/stats.js')
 
 const config_path = process.env.TRANSFORM_CONFIG_PATH
 
+function handleSubscriptions() {
+    
+    if (is_test_mode === false) {
+        if ( !global.client.connected ) return
+
+        global.client.unsubscribe('#')
+
+        global.devices_to_monitor.forEach(topic => {
+            logging.info(' => subscribing to: ' + topic)
+            global.client.subscribe(topic)
+        });
+    }
+}
+
 // Setup MQTT
 if (is_test_mode === false) {
     global.client = mqtt.setupClient(function() {
         logging.info('MQTT Connected', {
             action: 'mqtt-connected'
         })
-        global.client.subscribe('#')
-
+        handleSubscriptions()
     }, function() {
         logging.error('Disconnected', {
             action: 'mqtt-disconnected'
@@ -301,6 +314,8 @@ rules.on('rules-loaded', () => {
         devices_to_monitor: global.devices_to_monitor
     })
 
+    handleSubscriptions()
+    
     schedule.scheduleJobs()
     api.updateRules(rules)
 })
