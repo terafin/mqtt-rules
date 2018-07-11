@@ -422,3 +422,47 @@ describe('time based triggers', function() {
     }).timeout(5000)
 })
 
+
+describe('notifications', function() {
+    before(function() {
+        // runs before all tests in this block
+        global.setOverrideContext(null)
+        global.clearQueues()
+    })
+
+    this.slow(1200)
+
+    // it('test a simple notification', function(done) {
+    //     this.slow(16000)
+    //     const rule = generateRule('\
+    //         notification_simple_rule: \n\
+    //         schedule: \n\
+    //           soon: "*/2 * * * * *" \n\
+    //         actions: \n\
+    //           "/test/timer/simple_simple": "1" \n\
+    //         notify: \n\
+    //           message: "Test Messages"\n\
+    //           title: "Test Title"\n\
+    //         ')
+    //     jobscheduler.scheduleJob('notification_simple', 'notification_simple', '*/2 * * * * *', rule)
+    //     setupTest('/test/simple_simple/fired', '1', done, 1)
+
+    // }).timeout(5000)
+
+    it('test a fancy notification', function(done) {
+        this.slow(16000)
+        const rule = generateRule('\
+            notification_fancy_rule: \n\
+            schedule: \n\
+              soon: "*/2 * * * * *" \n\
+            actions: \n\
+              "/test/timer_fancy/fired": "1" \n\
+            notify: \n\
+              message: \'"Test Fancy" + " hello!"|uppercase\' \n\
+              title: "Test Title"\n\
+            ')
+        jobscheduler.scheduleJob('notification_fancy', 'notification_fancy', '*/2 * * * * *', rule)
+        setupTest('/test/timer_fancy/fired', '1', done, 1)
+
+    }).timeout(5000)
+})
