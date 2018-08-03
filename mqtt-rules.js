@@ -19,6 +19,8 @@ require('homeautomation-js-lib/devices.js')
 require('homeautomation-js-lib/mqtt_helpers.js')
 require('homeautomation-js-lib/redis_helpers.js')
 
+var collectedMQTTTChanges = null
+
 const api = require('./lib/api.js')
 const utilities = require('./lib/utilities.js')
 const schedule = require('./lib/scheduled-jobs.js')
@@ -26,6 +28,70 @@ const evaluation = require('./lib/evaluation.js')
 const metrics = require('homeautomation-js-lib/stats.js')
 
 const config_path = process.env.TRANSFORM_CONFIG_PATH
+
+const connectionProcessorDelay = 2
+var shouldProcessIncomingMessages = false
+
+function startCollectingMQTTChanges() {
+    if ( _.isNil(collectedMQTTTChanges) )
+        collectedMQTTTChanges = {}
+}
+
+function stopCollectingMQTTChanges() {
+    collectedMQTTTChanges = null
+}
+
+function handleRedisConnection() {
+    logging.info(' * redis connection')
+    handleConnectionEvent()
+}
+function handleMQTTConnection() {
+    startCollectingMQTTChanges()
+
+    handleSubscriptions()
+
+    logging.info(' * MQTT connection')
+    handleConnectionEvent()
+}
+
+function disconnectionEvent() {
+    if ( global.client.connected && global.redis.connected ) return
+    
+    startCollectingMQTTChanges()
+}
+
+function connectionProcessor() {
+    logging.info('Processing bulk connection setup')
+
+    // need to capture everything that comes in, and process it as such
+    const changedTopics = Object.keys(collectedMQTTTChanges)
+
+    changedTopics.forEach(topic => {
+        const message = collectedMQTTTChanges[topic]
+
+        global.generateContext(topic, message, function(outTopic, outMessage, context) {
+            if ( _.isNil(outTopic) || _.isNil(outMessage) ) {
+                logging.error(' *** NOT Processing rules for: ' + topic)
+                logging.error('                     outTopic: ' + outTopic)
+                logging.error('                   outMessage: ' + outMessage)
+            } else {
+                context['firstRun'] = true
+                global.changeProcessor(rules.get_configs(), context, outTopic, outMessage)
+            }
+        })
+    });
+
+    stopCollectingMQTTChanges()
+}
+
+function handleConnectionEvent() {
+    if ( !global.client.connected ) return
+    if ( !global.redis.connected ) return
+    
+    logging.info(' Both are good to go - kicking connection processing in ' + connectionProcessorDelay)
+
+    setTimeout(connectionProcessor, (connectionProcessorDelay * 1000))
+}
 
 function handleSubscriptions() {
     
@@ -47,7 +113,7 @@ if (is_test_mode === false) {
         logging.info('MQTT Connected', {
             action: 'mqtt-connected'
         })
-        handleSubscriptions()
+        handleMQTTConnection()
     }, function() {
         logging.error('Disconnected', {
             action: 'mqtt-disconnected'
@@ -74,6 +140,7 @@ global.devices_to_monitor = []
 global.changeProcessor = function(rules, context, topic, message) {
     context[utilities.update_topic_for_expression(topic)] = message
 
+    const firstRun = context['firstRun']
     const ruleStartTime = new Date().getTime()
     logging.debug(' rule processing start ', {
         action: 'rule-processing-start',
@@ -85,6 +152,13 @@ global.changeProcessor = function(rules, context, topic, message) {
             logging.error('empty rule passed, with name: ' + rule_name)
             return
         }
+        const skipFirstRun = _.isNil(rule.skipFirstRun) ? false : rule.skipFirstRun
+
+        if ( firstRun && skipFirstRun ) {
+            logging.info(' skipping rule, due to first run skip: ' + rule_name)
+            return
+        }
+
         const disabled = rule.disabled
 
         if (disabled == true) return
@@ -181,6 +255,12 @@ global.generateContext = function(topic, inMessage, callback) {
                 // bug here with index
             const value = values[index]
             const newKey = utilities.update_topic_for_expression(key)
+
+            // If for some reason we passed in a null message, let's see waht redis has to say here
+            if (key === topic && _.isNil(message)) {
+                message = utilities.convertToNumberIfNeeded(value)
+            }
+            
             if (key === topic)
                 context[newKey] = utilities.convertToNumberIfNeeded(message)
             else
@@ -218,6 +298,12 @@ global.generateContext = function(topic, inMessage, callback) {
 
 if (is_test_mode === false) {
     global.client.on('message', (topic, message) => {
+        if ( !_.isNil(collectedMQTTTChanges) ) {
+            logging.info(' * pending processing update for: ' + topic + '  => not yet connected to redis')
+            collectedMQTTTChanges[topic] = message
+            return
+        }
+
         var foundMatch = null
         global.devices_to_monitor.forEach(deviceToMontor => {
             if ( !_.isNil(foundMatch) ) return
@@ -250,6 +336,12 @@ global.redis = Redis.setupClient(function() {
     } else {
         logging.info('not - loading rules')
     }
+
+    handleRedisConnection()
+}, function() {
+    logging.info('redis disconnected ', {
+        action: 'redis-disconnected'
+    })
 })
 
 rules.on('rules-loaded', () => {
