@@ -21,7 +21,7 @@ const schedule = require('./lib/scheduled-jobs.js')
 const evaluation = require('./lib/evaluation.js')
 
 const config_path = process.env.TRANSFORM_CONFIG_PATH
-const connectionProcessorDelay = 2
+const connectionProcessorDelay = 10
 
 var is_test_mode = process.env.TEST_MODE
 
