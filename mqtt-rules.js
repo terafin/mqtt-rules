@@ -42,7 +42,7 @@ const stopCollectingMQTTChanges = function() {
 }
 
 const handleRedisConnection = function() {
-	logging.info(' * redis connection')
+	logging.info(' Redis Connected')
 	handleConnectionEvent()
 }
 
@@ -51,7 +51,7 @@ const handleMQTTConnection = function() {
 
 	handleSubscriptions()
 
-	logging.info(' * MQTT connection')
+	logging.info(' MQTT Connected')
 	handleConnectionEvent()
 }
 
@@ -60,11 +60,12 @@ const disconnectionEvent = function() {
 		return
 	}
     
+	logging.error(' Disconnected from redis or MQTT')
 	startCollectingMQTTChanges()
 }
 
 const connectionProcessor = function() {
-	logging.info('Processing bulk connection setup')
+	logging.info(' => Processing bulk connection setup start')
 
 	// need to capture everything that comes in, and process it as such
 	const changedTopics = Object.keys(collectedMQTTTChanges)
@@ -85,6 +86,7 @@ const connectionProcessor = function() {
 	})
 
 	stopCollectingMQTTChanges()
+	logging.info(' => Done!')
 }
 
 const handleConnectionEvent = function() {
@@ -110,7 +112,7 @@ const handleSubscriptions = function() {
 		global.client.unsubscribe('#')
 
 		global.devices_to_monitor.forEach(topic => {
-			logging.info(' => subscribing to: ' + topic)
+			logging.debug(' => subscribing to: ' + topic)
 			global.client.subscribe(topic)
 		})
 	}
@@ -119,14 +121,8 @@ const handleSubscriptions = function() {
 // Setup MQTT
 if (is_test_mode === false) {
 	global.client = mqtt.setupClient(function() {
-		logging.info('MQTT Connected', {
-			action: 'mqtt-connected'
-		})
 		handleMQTTConnection()
 	}, function() {
-		logging.error('Disconnected', {
-			action: 'mqtt-disconnected'
-		})
 		disconnectionEvent()
 	})
 }
@@ -248,7 +244,7 @@ global.generateContext = function(topic, inMessage, callback) {
 
 	if ( !_.isNil(overrideContext) ) {
 		devices_to_monitor = Object.keys(overrideContext)
-		logging.info('generating context from override: ' + JSON.stringify(overrideContext))
+		logging.debug('generating context from override: ' + JSON.stringify(overrideContext))
 	} else if ( is_test_mode == true ) {
 		callback(topic, message, {})
 		return
@@ -295,8 +291,8 @@ global.generateContext = function(topic, inMessage, callback) {
 		}
 
 		if ( !_.isNil(overrideContext) ) {
-			logging.info('generated context from override: ' + JSON.stringify(context))
-			logging.info('             devices_to_monitor: ' + JSON.stringify(devices_to_monitor))
+			logging.debug('generated context from override: ' + JSON.stringify(context))
+			logging.debug('             devices_to_monitor: ' + JSON.stringify(devices_to_monitor))
 		}
     
 		callback(topic, message, context)
@@ -337,7 +333,7 @@ if (is_test_mode === false) {
 		if ( _.isNil(foundMatch) ) {
 			return
 		} else {
-			logging.info(topic + ' matched with: ' + foundMatch)
+			logging.debug(topic + ' matched with: ' + foundMatch)
 		}
 
 		global.generateContext(topic, message, function(outTopic, outMessage, context) {
@@ -347,14 +343,11 @@ if (is_test_mode === false) {
 }
 
 global.redis = Redis.setupClient(function() {
-	logging.info('redis connected ', {
-		action: 'redis-connected'
-	})
 	if (is_test_mode == false) {
-		logging.info('loading rules')
+		logging.debug('loading rules')
 		rules.load_path(config_path)
 	} else {
-		logging.info('not - loading rules')
+		logging.debug('not - loading rules')
 	}
 
 	handleRedisConnection()
@@ -367,7 +360,7 @@ global.redis = Redis.setupClient(function() {
 
 rules.on('rules-loaded', () => {
 	if (is_test_mode == true) {
-		logging.info('test mode, not loading rules')
+		logging.debug('test mode, not loading rules')
 		return
 	}
 
@@ -422,10 +415,11 @@ rules.on('rules-loaded', () => {
 
 	global.devices_to_monitor = utilities.unique(global.devices_to_monitor)
 
-	logging.info('rules loaded ', {
+	logging.debug('rules loaded ', {
 		action: 'rules-loaded',
 		devices_to_monitor: global.devices_to_monitor
 	})
+	logging.info('rules loaded')
 
 	handleSubscriptions()
 
