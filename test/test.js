@@ -112,6 +112,20 @@ describe('quick trigger tests', function() {
 		global.changeProcessor([rule], {}, '/test/motion', '1')
 	}).timeout(500)
 
+	it('test motion should trigger topic with last topic set', function(done) {
+		const rule = generateRule(
+			'some_bathroom_lights_motion_trigger_string: \n\
+    watch: \n\
+      devices: ["/test/#"] \n\
+    actions: \n\
+      "/test/lights/last_set": "$TRIGGER_STRING" \n\
+    ')
+
+		setupTest('/test/lights/last_set', '/test/motion', done)
+
+		global.changeProcessor([rule], {}, '/test/motion', '1')
+	}).timeout(500)
+
 	it('test motion should trigger light off', function(done) {
 		const rule = generateRule(
 			'some_bathroom_lights_motion: \n\
