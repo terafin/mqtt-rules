@@ -162,7 +162,7 @@ global.changeProcessor = function(rules, context, topic, message) {
 			logging.error('empty rule passed, with name: ' + rule_name)
 			return
 		}
-		const skipFirstRun = _.isNil(rule.skipFirstRun) ? false : rule.skipFirstRun
+		const skipFirstRun = _.isNil(rule.skip_first_run) ? false : rule.skip_first_run
 
 		if ( firstRun && skipFirstRun ) {
 			logging.info(' skipping rule, due to first run skip: ' + rule_name)
