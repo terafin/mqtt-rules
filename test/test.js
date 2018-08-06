@@ -1,5 +1,8 @@
 const utilities = require('../lib/utilities.js')
 const TIMEZONE = utilities.getCurrentTimeZone()
+const _ = require('lodash')
+// const logging = require('homeautomation-js-lib/logging.js')
+
 console.log('Running in timezone: ' + TIMEZONE)
 
 process.env.TEST_MODE = true
@@ -37,7 +40,14 @@ var setupTest = function(topic, message, callback, minimumTime) {
 }
 
 var generateRule = function(ruleString) {
-	return yaml.safeLoad(ruleString)
+	var yamlLoaded = yaml.safeLoad(ruleString)
+	
+	Object.keys(yamlLoaded).forEach(rule_name => {
+		yamlLoaded[rule_name].options = {quiet: true}
+	})
+
+	return yamlLoaded
+
 }
 var generateContext = function(inContext) {
 	var outContext = {}
@@ -49,11 +59,28 @@ var generateContext = function(inContext) {
 	return outContext
 }
 
+const testScheduler = function(rule) {
+	Object.keys(rule).forEach(rule_name => {
+		const schedule = rule[rule_name].schedule
+
+		if ( _.isNil(schedule)){
+			return
+		}
+
+		Object.keys(schedule).forEach(function(schedule_key) {
+			var jobKey = rule_name + '.schedule.' + schedule_key
+			const cronSchedule = schedule[schedule_key]
+
+			jobscheduler.scheduleJob(rule_name, jobKey, cronSchedule, rule[rule_name])
+		})
+	})
+}
+
 global.publish = function(rule_name, expression, valueOrExpression, topic, message, options) {
 	if (topic.startsWith('happy')) {
 		return
 	}
-
+	
 	// console.log('incoming: ' + topic + ':' + message)
 	// console.log('  looking for: ' + targetTestTopic + ':' + targetTestMessage)
 
@@ -104,8 +131,7 @@ describe('quick trigger tests', function() {
     watch: \n\
       devices: ["/test/#"] \n\
     actions: \n\
-      "/test/lights/set": "/test/motion" \n\
-    ')
+      "/test/lights/set": "/test/motion"')
 
 		setupTest('/test/lights/set', '1', done)
 
@@ -118,8 +144,7 @@ describe('quick trigger tests', function() {
     watch: \n\
       devices: ["/test/#"] \n\
     actions: \n\
-      "/test/lights/last_set": "$TRIGGER_STRING" \n\
-    ')
+      "/test/lights/last_set": "$TRIGGER_STRING"')
 
 		setupTest('/test/lights/last_set', '/test/motion', done)
 
@@ -128,12 +153,11 @@ describe('quick trigger tests', function() {
 
 	it('test motion should trigger light off', function(done) {
 		const rule = generateRule(
-			'some_bathroom_lights_motion: \n\
+			'some_bathroom_lights_motion_08: \n\
     watch: \n\
       devices: ["/test/motion"] \n\
     actions: \n\
-      "/test/lights/set": "$TRIGGER_TOPIC" \n\
-    ')
+      "/test/lights/set": "$TRIGGER_TOPIC"')
 		setupTest('/test/lights/set', '0', done)
 
 		global.changeProcessor([rule], {}, '/test/motion', '0')
@@ -149,8 +173,7 @@ describe('quick trigger tests', function() {
         rule1: "/test/motion == 1"\n\
         rule2: "/test/motion == 0"\n\
     actions: \n\
-      "/test/lights/set": "/test/motion" \n\
-    ')
+      "/test/lights/set": "/test/motion"')
 		setupTest('/test/lights/set', '0', done)
 
 		global.changeProcessor([rule], {}, '/test/motion', '0')
@@ -269,7 +292,7 @@ describe('quick trigger tests', function() {
             rules:\n\
               expression: "(/test/home/mode == 1) || (/test/home/mode == 2)"\n\
             actions:\n\
-              "/test/livingroom/harmony/set": "off"\n')
+              "/test/livingroom/harmony/set": "off"')
 
 		setupTest('/test/livingroom/harmony/set', 'off', done)
 
@@ -329,7 +352,7 @@ describe('delay tests', function() {
 	it('test motion should trigger light on, then off 10s later', function(done) {
 		this.slow(10500)
 		const rule = generateRule(
-			'some_bathroom_lights_motion: \n\
+			'some_bathroom_lights_motion_09: \n\
     watch: \n\
       devices: ["/test/motion"] \n\
     actions: \n\
@@ -349,7 +372,7 @@ describe('delay tests', function() {
 	it('test motion should trigger light on, motion again 5s later, then off 10s later', function(done) {
 		this.slow(16000)
 		const rule = generateRule(
-			'some_bathroom_lights_motion: \n\
+			'some_bathroom_lights_motion_trigger_random: \n\
     watch: \n\
       devices: ["/test/motion"] \n\
     actions: \n\
@@ -405,34 +428,36 @@ describe('time based triggers', function() {
 
 	it('test if a trigger can fire inside a minute', function(done) {
 		this.slow(16000)
-		const rule = generateRule('\
-            test_timed_rule: \n\
-            schedule: \n\
-              soon: "*/2 * * * * *" \n\
-            actions: \n\
-              "/test/timer/fired": "1" \n\
-            ')
-		jobscheduler.scheduleJob('test_timed_rule', 'test_timed_rule', '*/2 * * * * *', rule)
+		const rule = generateRule(
+			'test_timed_rule: \n\
+  schedule: \n\
+    soon: "*/2 * * * * *" \n\
+  actions: \n\
+    "/test/timer/fired": "1"')
+			
+		testScheduler(rule)
+		
 		setupTest('/test/timer/fired', '1', done, 1)
 
 	}).timeout(5000)
 
 	it('test if a trigger can check values', function(done) {
 		this.slow(16000)
-		const rule = generateRule('\
-            test_timed_rule_with_value: \n\
-            schedule: \n\
-              soon: "*/2 * * * * *" \n\
-            actions: \n\
-              "/test/timer/print_value": "/test/timer/some_value" \n\
-            ')
+		const rule = generateRule(
+			'test_timed_rule_with_value: \n\
+  schedule: \n\
+    soon: "*/2 * * * * *" \n\
+  actions: \n\
+    "/test/timer/print_value": "/test/timer/some_value"')
 
 		const context = {
 			'/test/timer/some_value': '42',
 		}
     
 		global.setOverrideContext(context)
-		jobscheduler.scheduleJob('test_timed_rule', 'test_timed_rule', '*/2 * * * * *', rule)
+		
+		testScheduler(rule)
+		
 		setupTest('/test/timer/print_value', '42', done, 1)
 
 	}).timeout(5000)

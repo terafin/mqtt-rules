@@ -129,13 +129,21 @@ if (is_test_mode === false) {
 global.publishEvents = []
 
 global.publish = function(rule_name, expression, valueOrExpression, topic, message, inOptions) {
-	logging.info('=> rule: ' + rule_name + '  publishing: ' + topic + ':' + message + ' (expression: ' + expression + ' | value: ' + valueOrExpression + ')' + '  options: ' + JSON.stringify(inOptions))
 	var options = {retain: false}
+	var quiet = false
 
 	if (!_.isNil(inOptions)) {
+		if ( !_.isNil(inOptions.quiet) ) { 
+			quiet = inOptions.quiet 
+		}
+
 		Object.keys(inOptions).forEach(function(key) {
 			options[key] = inOptions[key]
 		})
+	}
+	
+	if ( !quiet ) { 
+		logging.info('=> rule: ' + rule_name + '  publishing: ' + topic + ':' + message + ' (expression: ' + expression + ' | value: ' + valueOrExpression + ')' + '  options: ' + JSON.stringify(inOptions)) 
 	}
 
 	global.client.publish(topic, message, options)
