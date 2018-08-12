@@ -156,7 +156,7 @@ global.changeProcessor = function(rules, context, topic, message) {
 
 	const firstRun = context['firstRun']
 	const ruleStartTime = new Date().getTime()
-	logging.debug(' rule processing start ', {
+	logging.info(' rule processing start ', {
 		action: 'rule-processing-start',
 		start_time: ruleStartTime
 	})
@@ -220,7 +220,7 @@ global.changeProcessor = function(rules, context, topic, message) {
 
 	async.each(rules, configProcessor)
 
-	logging.debug(' rule processing done ', {
+	logging.info(' rule processing done ', {
 		action: 'rule-processing-done',
 		processing_time: ((new Date().getTime()) - ruleStartTime)
 	})
@@ -238,7 +238,7 @@ global.generateContext = function(topic, inMessage, callback) {
     
 	var message = utilities.convertToNumberIfNeeded(inMessage)
 	const redisStartTime = new Date().getTime()
-	logging.debug(' redis query', {
+	logging.info(' redis query', {
 		action: 'redis-query-start',
 		start_time: redisStartTime
 	})
@@ -260,7 +260,7 @@ global.generateContext = function(topic, inMessage, callback) {
 
 	const processResults = function(err, values) {
 		const redisQueryTime = ((new Date().getTime()) - redisStartTime)
-		logging.debug(' redis query done', {
+		logging.info(' redis query done', {
 			action: 'redis-query-done',
 			query_time: redisQueryTime
 		})
