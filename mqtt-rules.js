@@ -176,6 +176,7 @@ global.changeProcessor = function(rules, context, topic, message) {
 		const disabled = rule.disabled
 
 		if (disabled == true) {
+			logging.info(' skipping rule, rule disabled: ' + rule_name)
 			return
 		}
 
@@ -207,7 +208,11 @@ global.changeProcessor = function(rules, context, topic, message) {
 				})
 
 				evaluation.evalulateValue(topic, context, rule_name, rule, false)
+			} else {
+				logging.info(' skipping rule, no match for devices in : ' + rule_name +  '    watch: ' + rule.devices)
 			}
+		} else {
+			logging.info(' skipping rule, no devices to watch: ' + JSON.stringify(rule))
 		}
 
 		callback()
@@ -326,7 +331,6 @@ if (is_test_mode === false) {
 			return
 		}
 		logging.info('incoming topic message: ' + topic)
-		logging.info('   global.devices_to_monitor: ' + global.devices_to_monitor)
 		var foundMatch = null
 		global.devices_to_monitor.forEach(deviceToMontor => {
 			if ( !_.isNil(foundMatch) ) {
@@ -340,10 +344,7 @@ if (is_test_mode === false) {
 		})
         
 		if ( _.isNil(foundMatch) ) {
-			logging.info('   ** NO MATCH FOUND FOR: ' + topic)
 			return
-		} else {
-			logging.info(topic + ' matched with: ' + foundMatch)
 		}
 
 		global.generateContext(topic, message, function(outTopic, outMessage, context) {
