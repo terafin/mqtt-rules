@@ -207,15 +207,6 @@ global.changeProcessor = function(rules, context, topic, message) {
 				})
 
 				evaluation.evalulateValue(topic, context, rule_name, rule, false)
-			} else {
-				logging.info('NO matched topic to rule', {
-					action: 'rule-match',
-					rule_name: rule_name,
-					topic: topic,
-					message: utilities.convertToNumberIfNeeded(message),
-					rule: rule,
-					context: context
-				})
 			}
 		}
 
