@@ -209,10 +209,10 @@ global.changeProcessor = function(rules, context, topic, message) {
 
 				evaluation.evalulateValue(topic, context, rule_name, rule, false)
 			} else {
-				logging.debug(' skipping rule, no match for devices in : ' + rule_name +  '    watch: ' + rule.watch.devices)
+				logging.info(' skipping rule, no match for devices in : ' + rule_name +  '    watch: ' + rule.watch.devices)
 			}
 		} else {
-			logging.info(' skipping rule, no devices to watch: ' + JSON.stringify(rule))
+			logging.debug(' skipping rule, no devices to watch: ' + JSON.stringify(rule))
 		}
 
 		callback()
@@ -429,7 +429,11 @@ rules.on('rules-loaded', () => {
 		action: 'rules-loaded',
 		devices_to_monitor: global.devices_to_monitor
 	})
-	logging.info('rules loaded')
+	logging.info('rules loaded:')
+	rules.get_configs().forEach(rule => {
+		logging.info('   rule:' + JSON.stringify(rule))
+	})
+	
 
 	handleSubscriptions()
 
