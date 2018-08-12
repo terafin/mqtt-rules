@@ -209,7 +209,7 @@ global.changeProcessor = function(rules, context, topic, message) {
 
 				evaluation.evalulateValue(topic, context, rule_name, rule, false)
 			} else {
-				logging.info(' skipping rule, no match for devices in : ' + rule_name +  '    watch: ' + rule.watch.devices)
+				logging.debug(' skipping rule, no match for devices in : ' + rule_name +  '    watch: ' + rule.watch.devices)
 			}
 		} else {
 			logging.info(' skipping rule, no devices to watch: ' + JSON.stringify(rule))
