@@ -225,7 +225,7 @@ global.changeProcessor = function(rules, context, topic, message) {
 
 	async.each(rules, configProcessor)
 
-	logging.info(' rule processing done ', {
+	logging.debug(' rule processing done ', {
 		action: 'rule-processing-done',
 		processing_time: ((new Date().getTime()) - ruleStartTime)
 	})
