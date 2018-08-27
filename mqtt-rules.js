@@ -159,7 +159,7 @@ global.changeProcessor = function(rules, context, topic, message) {
 
 	const firstRun = context['firstRun']
 	const ruleStartTime = new Date().getTime()
-	logging.info(' rule processing start ', {
+	logging.debug(' rule processing start ', {
 		action: 'rule-processing-start',
 		start_time: ruleStartTime
 	})
@@ -172,7 +172,7 @@ global.changeProcessor = function(rules, context, topic, message) {
 		const skipFirstRun = _.isNil(rule.skip_first_run) ? false : rule.skip_first_run
 
 		if ( firstRun && skipFirstRun ) {
-			logging.info(' skipping rule, due to first run skip: ' + rule_name)
+			logging.debug(' skipping rule, due to first run skip: ' + rule_name)
 			return
 		}
 
@@ -201,7 +201,7 @@ global.changeProcessor = function(rules, context, topic, message) {
     
             
 			if ( !_.isNil(foundMatch) ) {
-				logging.info('matched topic to rule', {
+				logging.debug('matched topic to rule', {
 					action: 'rule-match',
 					rule_name: rule_name,
 					topic: topic,
@@ -246,7 +246,7 @@ global.generateContext = function(topic, inMessage, callback) {
     
 	var message = utilities.convertToNumberIfNeeded(inMessage)
 	const redisStartTime = new Date().getTime()
-	logging.info(' redis query', {
+	logging.debug(' redis query', {
 		action: 'redis-query-start',
 		start_time: redisStartTime
 	})
@@ -268,7 +268,7 @@ global.generateContext = function(topic, inMessage, callback) {
 
 	const processResults = function(err, values) {
 		const redisQueryTime = ((new Date().getTime()) - redisStartTime)
-		logging.info(' redis query done', {
+		logging.debug(' redis query done', {
 			action: 'redis-query-done',
 			query_time: redisQueryTime
 		})
@@ -432,12 +432,14 @@ rules.on('rules-loaded', () => {
 		action: 'rules-loaded',
 		devices_to_monitor: global.devices_to_monitor
 	})
+
 	logging.info('rules loaded')
 	rules.get_configs().forEach(rule => {
-		logging.debug('   rule:' + JSON.stringify(rule))
+		Object.keys(rule).forEach(rule_name => {
+			logging.info('   rule: ' + rule_name)
+		})
 	})
 	
-
 	handleSubscriptions()
 
 	schedule.scheduleJobs()
