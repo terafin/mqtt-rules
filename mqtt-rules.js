@@ -8,6 +8,7 @@ const mqtt_wildcard = require('mqtt-wildcard')
 const rules = require('homeautomation-js-lib/rules.js')
 const logging = require('homeautomation-js-lib/logging.js')
 const metrics = require('homeautomation-js-lib/stats.js')
+const health = require('homeautomation-js-lib/health.js')
 
 require('homeautomation-js-lib/devices.js')
 require('homeautomation-js-lib/mqtt_helpers.js')
@@ -60,6 +61,7 @@ const disconnectionEvent = function() {
 		return
 	}
     
+	health.unhealthyEvent()
 	logging.error(' Disconnected from redis or MQTT')
 	startCollectingMQTTChanges()
 }
@@ -98,6 +100,7 @@ const handleConnectionEvent = function() {
 	}
     
 	logging.info(' Both are good to go - kicking connection processing in ' + connectionProcessorDelay)
+	health.healthyEvent()
 
 	setTimeout(connectionProcessor, (connectionProcessorDelay * 1000))
 }
