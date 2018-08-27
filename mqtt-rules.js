@@ -67,7 +67,7 @@ const disconnectionEvent = function() {
 }
 
 const connectionProcessor = function() {
-	logging.info(' => Processing bulk connection setup start')
+	logging.info(' * Processing bulk connection setup start')
 
 	// need to capture everything that comes in, and process it as such
 	const changedTopics = Object.keys(collectedMQTTTChanges)
@@ -435,7 +435,12 @@ rules.on('rules-loaded', () => {
 
 	logging.info('rules loaded')
 	rules.get_configs().forEach(rule => {
-		Object.keys(rule).forEach(rule_name => {
+		const keys = Object.keys(rule)
+		if ( _.isNil(keys) ) { 
+			return 
+		}
+		
+		keys.forEach(rule_name => {
 			logging.info('   rule: ' + rule_name)
 		})
 	})
