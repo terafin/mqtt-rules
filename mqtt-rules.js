@@ -435,11 +435,12 @@ rules.on('rules-loaded', () => {
 
 	logging.info('rules loaded')
 	rules.get_configs().forEach(rule => {
-		const keys = Object.keys(rule)
 		if ( _.isNil(rule) ) { 
 			logging.error(' empty rule from iterator')
 			return 
 		}
+
+		const keys = Object.keys(rule)
 
 		if ( _.isNil(keys) ) { 
 			logging.error(' missing keys from rule: ' + JSON.stringify(rule))
