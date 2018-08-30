@@ -25,6 +25,7 @@
         "mocha": "latest",
         "moment-timezone": "latest",
         "mqtt": "latest",
+        "feels": "latest",
         "request": "latest",
         "node-schedule-tz": "latest",
         "pushover-notifications": "latest",
