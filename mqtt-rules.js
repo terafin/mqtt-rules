@@ -5,7 +5,6 @@ const async = require('async')
 const _ = require('lodash')
 const mqtt_wildcard = require('mqtt-wildcard')
 
-const rules = require('homeautomation-js-lib/rules.js')
 const logging = require('homeautomation-js-lib/logging.js')
 const metrics = require('homeautomation-js-lib/stats.js')
 const health = require('homeautomation-js-lib/health.js')
@@ -16,6 +15,7 @@ require('homeautomation-js-lib/redis_helpers.js')
 
 var collectedMQTTTChanges = null
 
+const rules = require('./lib/loading.js')
 const api = require('./lib/api.js')
 const utilities = require('./lib/utilities.js')
 const schedule = require('./lib/scheduled-jobs.js')
@@ -38,6 +38,14 @@ const startCollectingMQTTChanges = function() {
 	}
 }
 
+const isCollectingMQTTChanges = function() {
+	return !_.isNil(collectedMQTTTChanges)
+}
+
+const collectChange = function(topic, message) {
+	collectedMQTTTChanges[topic] = message
+}
+
 const stopCollectingMQTTChanges = function() {
 	collectedMQTTTChanges = null
 }
@@ -48,6 +56,37 @@ const handleRedisConnection = function() {
 }
 
 const handleMQTTConnection = function() {
+	if (is_test_mode === false) {
+		global.client.on('message', (topic, message) => {
+			if ( isCollectingMQTTChanges() ) {
+				logging.info(' * pending processing update for: ' + topic + '  => (handling in bulk)')
+				collectChange(topic, message)
+				return
+			}
+			var foundMatch = null
+			global.devices_to_monitor.forEach(deviceToMontor => {
+				if ( !_.isNil(foundMatch) ) {
+					return 
+				}
+	
+				const match = mqtt_wildcard(topic, deviceToMontor)
+				if ( !_.isNil(match) ) {
+					foundMatch = match
+				}
+			})
+			
+			if ( _.isNil(foundMatch) ) {
+				return
+			}
+	
+			logging.info('incoming topic message: ' + topic)
+
+			global.generateContext(topic, message, function(outTopic, outMessage, context) {
+				global.changeProcessor(rules.get_configs(), context, topic, message)
+			})
+		})
+	}
+
 	startCollectingMQTTChanges()
 
 	handleSubscriptions()
@@ -57,7 +96,7 @@ const handleMQTTConnection = function() {
 }
 
 const disconnectionEvent = function() {
-	if ( global.client.connected && global.redis.connected ) {
+	if ( !_.isNil(global.client) && global.client.connected && global.redis.connected ) {
 		return
 	}
     
@@ -92,7 +131,7 @@ const connectionProcessor = function() {
 }
 
 const handleConnectionEvent = function() {
-	if ( !global.client.connected ) { 
+	if ( _.isNil(global.client) || !global.client.connected ) { 
 		return 
 	}
 	if ( !global.redis.connected ) { 
@@ -108,7 +147,7 @@ const handleConnectionEvent = function() {
 const handleSubscriptions = function() {
     
 	if (is_test_mode === false) {
-		if ( !global.client.connected ) { 
+		if ( _.isNil(global.client) || !global.client.connected ) { 
 			return 
 		}
 
@@ -121,14 +160,17 @@ const handleSubscriptions = function() {
 	}
 }
 
+const setupMQTT = function() {
 // Setup MQTT
-if (is_test_mode === false) {
-	global.client = mqtt.setupClient(function() {
-		handleMQTTConnection()
-	}, function() {
-		disconnectionEvent()
-	})
+	if (is_test_mode === false) {
+		global.client = mqtt.setupClient(function() {
+			handleMQTTConnection()
+		}, function() {
+			disconnectionEvent()
+		})
+	}
 }
+
 global.publishEvents = []
 
 global.publish = function(rule_name, expression, valueOrExpression, topic, message, inOptions) {
@@ -149,7 +191,11 @@ global.publish = function(rule_name, expression, valueOrExpression, topic, messa
 		logging.info('=> rule: ' + rule_name + '  publishing: ' + topic + ':' + message + ' (expression: ' + expression + ' | value: ' + valueOrExpression + ')' + '  options: ' + JSON.stringify(inOptions)) 
 	}
 
-	global.client.publish(topic, message, options)
+	if ( _.isNil(global.client) ) {
+		logging.error('=> (client not initialized, not publishing) rule: ' + rule_name + '  publishing: ' + topic + ':' + message + ' (expression: ' + expression + ' | value: ' + valueOrExpression + ')' + '  options: ' + JSON.stringify(inOptions)) 
+	} else {
+		global.client.publish(topic, message, options)
+	}
 }
 
 global.devices_to_monitor = []
@@ -326,36 +372,6 @@ global.generateContext = function(topic, inMessage, callback) {
 	}
 }
 
-if (is_test_mode === false) {
-	global.client.on('message', (topic, message) => {
-		if ( !_.isNil(collectedMQTTTChanges) ) {
-			logging.info(' * pending processing update for: ' + topic + '  => not yet connected to redis')
-			collectedMQTTTChanges[topic] = message
-			return
-		}
-		logging.info('incoming topic message: ' + topic)
-		var foundMatch = null
-		global.devices_to_monitor.forEach(deviceToMontor => {
-			if ( !_.isNil(foundMatch) ) {
-				return 
-			}
-
-			const match = mqtt_wildcard(topic, deviceToMontor)
-			if ( !_.isNil(match) ) {
-				foundMatch = match
-			}
-		})
-        
-		if ( _.isNil(foundMatch) ) {
-			return
-		}
-
-		global.generateContext(topic, message, function(outTopic, outMessage, context) {
-			global.changeProcessor(rules.get_configs(), context, topic, message)
-		})
-	})
-}
-
 global.redis = Redis.setupClient(function() {
 	if (is_test_mode == false) {
 		logging.debug('loading rules')
@@ -451,9 +467,8 @@ rules.on('rules-loaded', () => {
 			logging.info('   rule: ' + rule_name)
 		})
 	})
-	
-	handleSubscriptions()
 
+	setupMQTT()
 	schedule.scheduleJobs()
 	api.updateRules(rules)
 })

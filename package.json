@@ -22,6 +22,7 @@
         "jexl": "latest",
         "js-yaml": "latest",
         "lodash": "latest",
+        "read-directory": "latest",
         "mocha": "latest",
         "moment-timezone": "latest",
         "mqtt": "latest",
