@@ -79,7 +79,7 @@ const handleMQTTConnection = function() {
 				return
 			}
 	
-			logging.info('incoming topic message: ' + topic)
+			logging.debug('incoming topic message: ' + topic)
 
 			global.generateContext(topic, message, function(outTopic, outMessage, context) {
 				global.changeProcessor(rules.get_configs(), context, topic, message)
@@ -161,7 +161,10 @@ const handleSubscriptions = function() {
 }
 
 const setupMQTT = function() {
-// Setup MQTT
+	if ( !_.isNil(global.client) ) {
+		return
+	}
+
 	if (is_test_mode === false) {
 		global.client = mqtt.setupClient(function() {
 			handleMQTTConnection()
@@ -449,24 +452,7 @@ rules.on('rules-loaded', () => {
 		devices_to_monitor: global.devices_to_monitor
 	})
 
-	logging.info('rules loaded')
-	rules.get_configs().forEach(rule => {
-		if ( _.isNil(rule) ) { 
-			logging.error(' empty rule from iterator')
-			return 
-		}
-
-		const keys = Object.keys(rule)
-
-		if ( _.isNil(keys) ) { 
-			logging.error(' missing keys from rule: ' + JSON.stringify(rule))
-			return 
-		}
-
-		keys.forEach(rule_name => {
-			logging.info('   rule: ' + rule_name)
-		})
-	})
+	logging.info(' => Rules loaded')
 
 	setupMQTT()
 	schedule.scheduleJobs()
