@@ -1,0 +1,25 @@
+some_bathroom_lights_motion:
+  name: motion should trigger light on
+  test:
+    timeout: 500
+    input:
+      "/test/motion": "1"
+    target:
+      "/test/lights/set": "1"
+  watch:
+    devices: ["/test/#"]
+  actions:
+    "/test/lights/set": "$TRIGGER_TOPIC"
+
+some_bathroom_lights_motion_off:
+  name: motion should trigger light off
+  test:
+    timeout: 500
+    input:
+      "/test/motion": "0"
+    target:
+      "/test/lights/set": "0"
+  watch:
+    devices: ["/test/#"]
+  actions:
+    "/test/lights/set": "$TRIGGER_TOPIC"

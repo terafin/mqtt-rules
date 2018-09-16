@@ -2,11 +2,13 @@ const utilities = require('../lib/utilities.js')
 const TIMEZONE = utilities.getCurrentTimeZone()
 const _ = require('lodash')
 // const logging = require('homeautomation-js-lib/logging.js')
+const read_directory = require('read-directory')
+const async = require('async')
 
 console.log('Running in timezone: ' + TIMEZONE)
 
 process.env.TEST_MODE = true
-
+const testYAMLPath = process.env.TEST_YAML_PATH
 const yaml = require('js-yaml')
 
 require('../mqtt-rules.js')
@@ -18,7 +20,7 @@ var targetCallback = null
 var targetEarliestDate = null
 var targetStartDate = null
 
-var clearState = function() {
+var clearState = function () {
 	targetTestTopic = null
 	targetTestMessage = null
 	targetCallback = null
@@ -26,7 +28,7 @@ var clearState = function() {
 	targetStartDate = null
 }
 
-var setupTest = function(topic, message, callback, minimumTime) {
+var setupTest = function (topic, message, callback, minimumTime) {
 	clearState()
 
 	targetTestTopic = topic
@@ -39,35 +41,36 @@ var setupTest = function(topic, message, callback, minimumTime) {
 	}
 }
 
-var generateRule = function(ruleString) {
+var generateRule = function (ruleString) {
 	var yamlLoaded = yaml.safeLoad(ruleString)
-	
+
 	Object.keys(yamlLoaded).forEach(rule_name => {
-		yamlLoaded[rule_name].options = {quiet: true}
+		yamlLoaded[rule_name].options = {
+			quiet: true
+		}
 	})
 
 	return yamlLoaded
-
 }
-var generateContext = function(inContext) {
+var generateContext = function (inContext) {
 	var outContext = {}
 
-	Object.keys(inContext).forEach(function(key) {
+	Object.keys(inContext).forEach(function (key) {
 		outContext[utilities.update_topic_for_expression(key)] = inContext[key]
 	})
 
 	return outContext
 }
 
-const testScheduler = function(rule) {
+const testScheduler = function (rule) {
 	Object.keys(rule).forEach(rule_name => {
 		const schedule = rule[rule_name].schedule
 
-		if ( _.isNil(schedule)){
+		if (_.isNil(schedule)) {
 			return
 		}
 
-		Object.keys(schedule).forEach(function(schedule_key) {
+		Object.keys(schedule).forEach(function (schedule_key) {
 			var jobKey = rule_name + '.schedule.' + schedule_key
 			const cronSchedule = schedule[schedule_key]
 
@@ -76,18 +79,18 @@ const testScheduler = function(rule) {
 	})
 }
 
-global.publish = function(rule_name, expression, valueOrExpression, topic, message, options) {
+global.publish = function (rule_name, expression, valueOrExpression, topic, message, options) {
 	if (topic.startsWith('happy')) {
 		return
 	}
-	
+
 	// console.log('incoming: ' + topic + ':' + message)
 	// console.log('  looking for: ' + targetTestTopic + ':' + targetTestMessage)
 
 	if (topic == targetTestTopic &&
-        message == targetTestMessage) {
+		message == targetTestMessage) {
 		if ((targetCallback != null)) {
-			// console.log('incoming: ' + topic + ' : ' + message + '   (time: ' + (new Date().getTime()) / 1000 + ')')
+			//  console.log('incoming: ' + topic + ' : ' + message + '   (time: ' + (new Date().getTime()) / 1000 + ')')
 			var tooEarly = false
 			var howEarly = 0
 			var desiredMinimum = 0
@@ -108,8 +111,8 @@ global.publish = function(rule_name, expression, valueOrExpression, topic, messa
 
 			setTimeout(function cb() {
 				if (tooEarly) {
-					oldCallBack('test finished too early (' + howEarly + 's vs ' + desiredMinimum + 's)') 
-				} else { 
+					oldCallBack('test finished too early (' + howEarly + 's vs ' + desiredMinimum + 's)')
+				} else {
 					oldCallBack()
 				}
 			})
@@ -117,28 +120,110 @@ global.publish = function(rule_name, expression, valueOrExpression, topic, messa
 	}
 }
 
-describe('quick trigger tests', function() {
-	before(function() {
+const testProcessor = function (rule, rule_name, test, test_name) {
+	var test_timeout = test.timeout
+	const context = test.context
+	const input = test.input
+	const target = test.target
+
+	if ( _.isNil(test_timeout)) {
+		test_timeout = 500
+	} else {
+		test_timeout = test_timeout + 200
+	}
+
+	const inputTopic = Object.keys(input)[0]
+	const inputValue = input[inputTopic]
+
+	const targetTopic = Object.keys(target)[0]
+	const targetValue = target[targetTopic]
+
+	var formattedRule = {}
+	formattedRule[rule_name] = rule
+
+	var generatedContext = {}
+
+	if (!_.isNil(context)) {
+		Object.keys(context).forEach(topic => {
+			generatedContext[utilities.update_topic_for_expression(topic)] = utilities.convertToNumberIfNeeded(context[topic])
+		});
+	}
+
+
+	it(test_name, function (done) {
+		this.slow(test_timeout + 200)
+		setupTest(targetTopic, targetValue, done)
+		global.changeProcessor([formattedRule], generatedContext, inputTopic, inputValue)
+	}).timeout(Number(test_timeout))
+}
+
+const processRuleFile = function (doc) {
+	if (_.isNil(doc)) {
+		return
+	}
+
+	Object.keys(doc).forEach(rule_name => {
+		const rule = doc[rule_name]
+
+		const test = rule.test
+		const tests = rule.tests
+
+		if (_.isNil(test) && _.isNil(tests)) {
+			return
+		}
+
+		var testsToRun = {}
+
+		if (!_.isNil(test)) {
+			testsToRun[rule_name] = test
+		}
+
+		if (!_.isNil(tests)) {
+			Object.keys(tests).forEach(innerTest => {
+				const key = rule_name + '_' + innerTest
+				testsToRun[key] = tests[innerTest]
+			});
+		}
+
+		Object.keys(testsToRun).forEach(testName => {
+			testProcessor(rule, rule_name, testsToRun[testName], testName)
+		});
+
+	})
+}
+
+describe('quick trigger tests', function () {
+	before(function () {
 		// runs before all tests in this block
 		global.clearQueues()
 	})
 
 	this.slow(100)
 
-	it('test motion should trigger light on', function(done) {
-		const rule = generateRule(
-			'some_bathroom_lights_motion: \n\
-    watch: \n\
-      devices: ["/test/#"] \n\
-    actions: \n\
-      "/test/lights/set": "/test/motion"')
 
-		setupTest('/test/lights/set', '1', done)
+	var documents = []
+	const yamlPath = !_.isNil(testYAMLPath) ? testYAMLPath : './test/yaml'
+	const files = read_directory.sync(yamlPath, {})
 
-		global.changeProcessor([rule], {}, '/test/motion', '1')
-	}).timeout(500)
+	const fileNames = Object.keys(files)
 
-	it('test motion should trigger topic with last topic set', function(done) {
+	fileNames.forEach(file => {
+		if (file.includes('._')) {
+			return
+		}
+
+		if (file.includes('.yml') || file.includes('.yaml')) {
+			const doc = yaml.safeLoad(files[file])
+
+			documents.push(doc)
+		}
+	})
+
+	documents.forEach(doc => {
+		processRuleFile(doc)
+	});
+
+	/* 	it('test motion should trigger topic with last topic set', function(done) {
 		const rule = generateRule(
 			'some_bathroom_lights_motion_trigger_string: \n\
     watch: \n\
@@ -149,18 +234,6 @@ describe('quick trigger tests', function() {
 		setupTest('/test/lights/last_set', '/test/motion', done)
 
 		global.changeProcessor([rule], {}, '/test/motion', '1')
-	}).timeout(500)
-
-	it('test motion should trigger light off', function(done) {
-		const rule = generateRule(
-			'some_bathroom_lights_motion_08: \n\
-    watch: \n\
-      devices: ["/test/motion"] \n\
-    actions: \n\
-      "/test/lights/set": "$TRIGGER_TOPIC"')
-		setupTest('/test/lights/set', '0', done)
-
-		global.changeProcessor([rule], {}, '/test/motion', '0')
 	}).timeout(500)
 
 	it('testing compound if expressions', function(done) {
@@ -337,10 +410,10 @@ describe('quick trigger tests', function() {
 
 		global.changeProcessor([rule], {}, '/environment/vents', '0')
 
-	}).timeout(500)
+	}).timeout(500) */
 
 })
-
+/* 
 describe('delay tests', function() {
 	before(function() {
 		// runs before all tests in this block
@@ -431,7 +504,7 @@ describe('time based triggers', function() {
 		const rule = generateRule(
 			'test_timed_rule: \n\
   schedule: \n\
-    soon: "*/2 * * * * *" \n\
+    soon: "2 * * * * *" \n\
   actions: \n\
     "/test/timer/fired": "1"')
 			
@@ -446,7 +519,7 @@ describe('time based triggers', function() {
 		const rule = generateRule(
 			'test_timed_rule_with_value: \n\
   schedule: \n\
-    soon: "*/2 * * * * *" \n\
+    soon: " * * * * *" \n\
   actions: \n\
     "/test/timer/print_value": "/test/timer/some_value"')
 
@@ -462,3 +535,52 @@ describe('time based triggers', function() {
 
 	}).timeout(5000)
 })
+
+describe('custom handlers', function() {
+	before(function() {
+		// runs before all tests in this block
+		global.setOverrideContext(null)
+		global.clearQueues()
+	})
+
+	this.slow(1200)
+
+	it('test NaN null', function(done) {
+		this.slow(16000)
+
+		const rule = generateRule(
+			'test_nan_null: \n\
+            watch: \n\
+              devices: ["/test/nil/value"] \n\
+            actions: \n\
+              "/test/nil/result": "/test/nil/value|isNaN" \n')
+
+
+		testScheduler(rule)
+		
+		setupTest('/test/nil/result', 'true', done, 1)
+
+		global.changeProcessor([rule], {}, '/test/nil/value', 'hello')
+
+	}).timeout(5000)
+
+	it('test NaN empty', function(done) {
+		this.slow(16000)
+
+		const rule = generateRule(
+			'test_nan_null: \n\
+            watch: \n\
+              devices: ["/test/nil/value"] \n\
+            actions: \n\
+              "/test/nil/result": "/test/nil/value|isNaN" \n')
+
+
+		testScheduler(rule)
+		
+		setupTest('/test/nil/result', 'true', done, 1)
+
+		global.changeProcessor([rule], {}, '/test/nil/value', '')
+
+	}).timeout(5000)
+})
+ */

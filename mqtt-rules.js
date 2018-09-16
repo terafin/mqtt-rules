@@ -32,6 +32,10 @@ if (is_test_mode == 'true') {
 	is_test_mode = false
 }
 
+
+global.isTestMode = function() {
+	return is_test_mode
+}
 const startCollectingMQTTChanges = function() {
 	if ( _.isNil(collectedMQTTTChanges) ) {
 		collectedMQTTTChanges = {} 
@@ -190,7 +194,7 @@ global.publish = function(rule_name, expression, valueOrExpression, topic, messa
 		})
 	}
 	
-	if ( !quiet ) { 
+	if ( !quiet && !global.isTestMode() ) { 
 		logging.info('=> rule: ' + rule_name + '  publishing: ' + topic + ':' + message + ' (expression: ' + expression + ' | value: ' + valueOrExpression + ')' + '  options: ' + JSON.stringify(inOptions)) 
 	}
 
@@ -204,6 +208,8 @@ global.publish = function(rule_name, expression, valueOrExpression, topic, messa
 global.devices_to_monitor = []
 
 global.changeProcessor = function(rules, context, topic, message) {
+	if ( _.isNil(context) ) { context = {} }
+
 	context[utilities.update_topic_for_expression(topic)] = message
 
 	const firstRun = context['firstRun']
