@@ -1,9 +1,8 @@
 const utilities = require('../lib/utilities.js')
 const TIMEZONE = utilities.getCurrentTimeZone()
 const _ = require('lodash')
-// const logging = require('homeautomation-js-lib/logging.js')
+const logging = require('homeautomation-js-lib/logging.js')
 const read_directory = require('read-directory')
-const async = require('async')
 
 console.log('Running in timezone: ' + TIMEZONE)
 
@@ -12,27 +11,24 @@ const testYAMLPath = process.env.TEST_YAML_PATH
 const yaml = require('js-yaml')
 
 require('../mqtt-rules.js')
-const jobscheduler = require('../lib/scheduled-jobs.js')
+const variables = require('../lib/variables.js')
 
-var targetTestTopic = null
-var targetTestMessage = null
+var targetTestActions = null
 var targetCallback = null
 var targetEarliestDate = null
 var targetStartDate = null
 
-var clearState = function () {
-	targetTestTopic = null
-	targetTestMessage = null
+var clearState = function() {
+	targetTestActions = null
 	targetCallback = null
 	targetEarliestDate = null
 	targetStartDate = null
 }
 
-var setupTest = function (topic, message, callback, minimumTime) {
+var setupTest = function(actions, callback, minimumTime) {
 	clearState()
 
-	targetTestTopic = topic
-	targetTestMessage = message
+	targetTestActions = actions
 	targetCallback = callback
 	if ((minimumTime != null) && minimumTime > 0) {
 		targetEarliestDate = new Date(new Date().getTime() + (minimumTime * 1000))
@@ -41,123 +37,116 @@ var setupTest = function (topic, message, callback, minimumTime) {
 	}
 }
 
-var generateRule = function (ruleString) {
-	var yamlLoaded = yaml.safeLoad(ruleString)
-
-	Object.keys(yamlLoaded).forEach(rule_name => {
-		yamlLoaded[rule_name].options = {
-			quiet: true
-		}
-	})
-
-	return yamlLoaded
-}
-var generateContext = function (inContext) {
-	var outContext = {}
-
-	Object.keys(inContext).forEach(function (key) {
-		outContext[utilities.update_topic_for_expression(key)] = inContext[key]
-	})
-
-	return outContext
-}
-
-const testScheduler = function (rule) {
-	Object.keys(rule).forEach(rule_name => {
-		const schedule = rule[rule_name].schedule
-
-		if (_.isNil(schedule)) {
-			return
-		}
-
-		Object.keys(schedule).forEach(function (schedule_key) {
-			var jobKey = rule_name + '.schedule.' + schedule_key
-			const cronSchedule = schedule[schedule_key]
-
-			jobscheduler.scheduleJob(rule_name, jobKey, cronSchedule, rule[rule_name])
-		})
-	})
-}
-
-global.publish = function (rule_name, expression, valueOrExpression, topic, message, options) {
+global.publish = function(rule_name, expression, valueOrExpression, topic, message, options) {
 	if (topic.startsWith('happy')) {
 		return
 	}
 
 	// console.log('incoming: ' + topic + ':' + message)
-	// console.log('  looking for: ' + targetTestTopic + ':' + targetTestMessage)
 
-	if (topic == targetTestTopic &&
-		message == targetTestMessage) {
-		if ((targetCallback != null)) {
-			//  console.log('incoming: ' + topic + ' : ' + message + '   (time: ' + (new Date().getTime()) / 1000 + ')')
-			var tooEarly = false
-			var howEarly = 0
-			var desiredMinimum = 0
-			if (targetEarliestDate != null) {
-				const now = new Date()
-				// console.log('minimum fire date: ' + targetEarliestDate + '   now: ' + now)
+	if ( _.isNil(targetTestActions)) {
+		logging.error('fail, I was not expecting anything and I got: ' + topic + ' message: ' + message)
+		return
+	}
 
-				// Fudge half a second, as sometimes timers early fire a little bit...
-				if (now + 0.5 < targetEarliestDate) {
-					tooEarly = true
-					howEarly = targetEarliestDate - now
-					desiredMinimum = (targetEarliestDate - targetStartDate) / 1000
+	const targetTestMessage = targetTestActions[topic]
+
+	if (!_.isNil(targetTestMessage) && message == targetTestMessage) {
+		delete(targetTestActions[topic])
+		// console.log('clearing: ' + topic)
+
+		if (Object.keys(targetTestActions).length == 0) {
+			// console.log('all clear!')
+
+			if ((targetCallback != null)) {
+				//  console.log('incoming: ' + topic + ' : ' + message + '   (time: ' + (new Date().getTime()) / 1000 + ')')
+				var tooEarly = false
+				var howEarly = 0
+				var desiredMinimum = 0
+				if (targetEarliestDate != null) {
+					const now = new Date()
+					// console.log('minimum fire date: ' + targetEarliestDate + '   now: ' + now)
+
+					// Fudge half a second, as sometimes timers early fire a little bit...
+					if (now + 0.5 < targetEarliestDate) {
+						tooEarly = true
+						howEarly = targetEarliestDate - now
+						desiredMinimum = (targetEarliestDate - targetStartDate) / 1000
+					}
 				}
+				var oldCallBack = targetCallback
+
+				clearState()
+
+				setTimeout(function cb() {
+					if (tooEarly) {
+						oldCallBack('test finished too early (' + howEarly + 's vs ' + desiredMinimum + 's)')
+					} else {
+						oldCallBack()
+					}
+				})
 			}
-			var oldCallBack = targetCallback
-
-			clearState()
-
-			setTimeout(function cb() {
-				if (tooEarly) {
-					oldCallBack('test finished too early (' + howEarly + 's vs ' + desiredMinimum + 's)')
-				} else {
-					oldCallBack()
-				}
-			})
+		} else {
+			// console.log('remaining: ' + Object.keys(targetTestActions))
 		}
+	} else {
+		logging.error('fail, I got: ' + topic + ' message: ' + message)
 	}
 }
 
-const testProcessor = function (rule, rule_name, test, test_name) {
+const msForProcessing = 15
+
+const testProcessor = function(rule, rule_name, test, test_name) {
 	var test_timeout = test.timeout
 	const context = test.context
 	const input = test.input
 	const target = test.target
 
-	if ( _.isNil(test_timeout)) {
-		test_timeout = 500
+	if (_.isNil(test_timeout)) {
+		test_timeout = msForProcessing
 	} else {
-		test_timeout = test_timeout + 200
+		test_timeout = test_timeout + msForProcessing
 	}
 
 	const inputTopic = Object.keys(input)[0]
 	const inputValue = input[inputTopic]
 
-	const targetTopic = Object.keys(target)[0]
-	const targetValue = target[targetTopic]
-
 	var formattedRule = {}
 	formattedRule[rule_name] = rule
 
-	var generatedContext = {}
+	var allTopics = []
 
 	if (!_.isNil(context)) {
-		Object.keys(context).forEach(topic => {
-			generatedContext[utilities.update_topic_for_expression(topic)] = utilities.convertToNumberIfNeeded(context[topic])
-		});
+		allTopics = allTopics.concat(Object.keys(context))
 	}
 
+	if (!_.isNil(inputTopic)) {
+		allTopics.push(inputTopic)
+	}
 
-	it(test_name, function (done) {
-		this.slow(test_timeout + 200)
-		setupTest(targetTopic, targetValue, done)
-		global.changeProcessor([formattedRule], generatedContext, inputTopic, inputValue)
-	}).timeout(Number(test_timeout))
+	it(test_name, function(done) {
+		this.slow(Number(test_timeout * 2))
+		this.timeout(Number(test_timeout * 3))
+
+		variables.clearState()
+		variables.updateObservedTopics(allTopics, function() {
+			global.devices_to_monitor = allTopics
+			if (!_.isNil(context)) {
+				Object.keys(context).forEach(topic => {
+					variables.update(topic, context[topic])
+				})
+			}
+
+			setupTest(target, done)
+
+			global.generateContext(inputTopic, inputValue, function(outTopic, outMessage, generatedContext) {
+				global.changeProcessor([formattedRule], generatedContext, outTopic, outMessage)
+			})
+		})
+	})
 }
 
-const processRuleFile = function (doc) {
+const processRuleFile = function(doc) {
 	if (_.isNil(doc)) {
 		return
 	}
@@ -182,24 +171,21 @@ const processRuleFile = function (doc) {
 			Object.keys(tests).forEach(innerTest => {
 				const key = rule_name + '_' + innerTest
 				testsToRun[key] = tests[innerTest]
-			});
+			})
 		}
 
 		Object.keys(testsToRun).forEach(testName => {
 			testProcessor(rule, rule_name, testsToRun[testName], testName)
-		});
+		})
 
 	})
 }
 
-describe('quick trigger tests', function () {
-	before(function () {
+describe('quick trigger tests', function() {
+	before(function() {
 		// runs before all tests in this block
 		global.clearQueues()
 	})
-
-	this.slow(100)
-
 
 	var documents = []
 	const yamlPath = !_.isNil(testYAMLPath) ? testYAMLPath : './test/yaml'
@@ -221,366 +207,6 @@ describe('quick trigger tests', function () {
 
 	documents.forEach(doc => {
 		processRuleFile(doc)
-	});
-
-	/* 	it('test motion should trigger topic with last topic set', function(done) {
-		const rule = generateRule(
-			'some_bathroom_lights_motion_trigger_string: \n\
-    watch: \n\
-      devices: ["/test/#"] \n\
-    actions: \n\
-      "/test/lights/last_set": "$TRIGGER_STRING"')
-
-		setupTest('/test/lights/last_set', '/test/motion', done)
-
-		global.changeProcessor([rule], {}, '/test/motion', '1')
-	}).timeout(500)
-
-	it('testing compound if expressions', function(done) {
-		const rule = generateRule(
-			'some_compound_if_expression: \n\
-    watch: \n\
-      devices: ["/test/motion"] \n\
-    expression: \n\
-      if: \n\
-        rule1: "/test/motion == 1"\n\
-        rule2: "/test/motion == 0"\n\
-    actions: \n\
-      "/test/lights/set": "/test/motion"')
-		setupTest('/test/lights/set', '0', done)
-
-		global.changeProcessor([rule], {}, '/test/motion', '0')
-	}).timeout(500)
-
-	it('test comparing values for true', function(done) {
-		const rule = generateRule(
-			'is_cooler_outside: \n\
-        watch:  \n\
-            devices: ["/test/environment/temperatures/current_area", "/test/environment/temperature/outdoors"] \n\
-        actions:  \n\
-            "/test/environment/temperatures/is_cooler_outside": "(/test/environment/temperatures/current_area > (/test/environment/temperature/outdoors + 0.5) ? 1 : 0" \n')
-
-		setupTest('/test/environment/temperatures/is_cooler_outside', '1', done)
-
-		const context = {
-			'/test/environment/temperatures/current_area': '20',
-		}
-		global.changeProcessor([rule], generateContext(context), '/test/environment/temperature/outdoors', '15')
-	}).timeout(500)
-
-	it('test comparing values for false', function(done) {
-		const rule = generateRule(
-			'is_cooler_outside: \n\
-        watch:  \n\
-            devices: ["/test/environment/temperatures/current_area", "/test/environment/temperature/outdoors"] \n\
-        actions:  \n\
-            "/test/environment/temperatures/is_cooler_outside": "(/test/environment/temperatures/current_area > (/test/environment/temperature/outdoors + 0.5) ? 1 : 0" \n')
-
-		setupTest('/test/environment/temperatures/is_cooler_outside', '0', done)
-
-		const context = {
-			'/test/environment/temperatures/current_area': '20',
-		}
-		global.changeProcessor([rule], generateContext(context), '/test/environment/temperature/outdoors', '25')
-	}).timeout(500)
-
-	it('test averaging numbers float', function(done) {
-		const rule = generateRule(
-			'sleeping_area_temperature_calculator: \n\
-            watch: \n\
-              devices: ["/test/environment/thermostat/temperature/bedroom", "/test/environment/thermostat/temperature/guest_bedroom"] \n\
-            actions: \n\
-              "/test/environment/temperatures/sleeping_area": "(/test/environment/thermostat/temperature/bedroom + /test/environment/thermostat/temperature/guest_bedroom) / 2"')
-
-		setupTest('/test/environment/temperatures/sleeping_area', '12.5', done)
-
-		const context = {
-			'/test/environment/thermostat/temperature/bedroom': '15',
-		}
-		global.changeProcessor([rule], generateContext(context), '/test/environment/thermostat/temperature/guest_bedroom', '10')
-	}).timeout(500)
-
-	it('test averaging numbers integer', function(done) {
-		const rule = generateRule(
-			'sleeping_area_temperature_calculator: \n\
-            watch: \n\
-              devices: ["/test/environment/thermostat/temperature/bedroom", "/test/environment/thermostat/temperature/guest_bedroom"] \n\
-            actions: \n\
-              "/test/environment/temperatures/sleeping_area": "(/test/environment/thermostat/temperature/bedroom + /test/environment/thermostat/temperature/guest_bedroom) / 2"')
-
-		setupTest('/test/environment/temperatures/sleeping_area', '15', done)
-
-		const context = {
-			'/test/environment/thermostat/temperature/bedroom': '20',
-		}
-		global.changeProcessor([rule], generateContext(context), '/test/environment/thermostat/temperature/guest_bedroom', '10')
-	}).timeout(500)
-
-
-	it('test home mode (or)', function(done) {
-		const rule = generateRule(
-			'test_nobody_home_mode: \n\
-          rules: \n\
-            expression: "(/test/presence/geofence/home/justin == 1 || /test/presence/geofence/home/elene == 1) && (/test/home/mode != 0 || /test/home/mode == 2)" \n\
-          watch: \n\
-            devices: ["/test/presence/geofence/home/justin", "/test/presence/geofence/home/elene"] \n\
-          actions: \n\
-            "/test/home/mode": "0"')
-
-		setupTest('/test/home/mode', '0', done)
-
-		const context = {
-			'/test/home/mode': '1',
-			'/test/presence/geofence/home/justin': '0'
-		}
-		global.changeProcessor([rule], generateContext(context), '/test/presence/geofence/home/elene', '1')
-	}).timeout(500)
-
-	it('test away mode (and)', function(done) {
-		const rule = generateRule(
-			'test_nobody_home_mode: \n\
-          rules: \n\
-            expression: "(/test/presence/geofence/home/justin == 0) && (/test/presence/geofence/home/elene == 0) && (/test/home/mode == 0 || /test/home/mode == 2)" \n\
-          watch: \n\
-            devices: ["/test/presence/geofence/home/justin", "/test/presence/geofence/home/elene"] \n\
-          actions: \n\
-            "/test/home/mode": "1"')
-
-		setupTest('/test/home/mode', '1', done)
-
-		const context = {
-			'/test/home/mode': '0',
-			'/test/presence/geofence/home/justin': '0',
-			'/test/presence/geofence/home/elene': '1'
-		}
-
-		global.changeProcessor([rule], generateContext(context), '/test/presence/geofence/home/elene', '0')
-	}).timeout(500)
-
-	it('simple evaluate, string result', function(done) {
-		const rule = generateRule(
-			'test_harmony_off_when_mode_changes:\n\
-            watch:\n\
-              devices: ["/test/home/mode"]\n\
-            rules:\n\
-              expression: "(/test/home/mode == 1) || (/test/home/mode == 2)"\n\
-            actions:\n\
-              "/test/livingroom/harmony/set": "off"')
-
-		setupTest('/test/livingroom/harmony/set', 'off', done)
-
-		global.changeProcessor([rule], {}, '/test/home/mode', '1')
-	}).timeout(500)
-
-	it('test simple value during a time', function(done) {
-		// front_door_lights:
-		//   allowed_times: ["17:00 - 23:59", "00:00 - 5:00"]
-		//   rules:
-		//     expression: "(/doors/front == 255) && (/house/lights == 0) && (/home/mode == 0)"
-		//   watch:
-		//     devices: ["/doors/front"]
-		//   actions:
-		//       "/house/lights/set": "1"
-		done()
-	}).timeout(500)
-
-	it('simple conditional action > 0', function(done) {
-		const rule = generateRule(
-			'vents: \n\
-        watch:\n\
-          devices: ["/environment/vents"]\n\
-        actions:\n\
-          "/guest_bathroom/vent/set": "(/environment/vents > 0) ? 50 : 0"\n')
-
-		setupTest('/guest_bathroom/vent/set', '50', done)
-
-		global.changeProcessor([rule], {}, '/environment/vents', '1')
-
-	}).timeout(500)
-
-	it('simple conditional action == 0', function(done) {
-		const rule = generateRule(
-			'vents: \n\
-        watch:\n\
-          devices: ["/environment/vents"]\n\
-        actions:\n\
-          "/guest_bathroom/vent/set": "(/environment/vents > 0) ? 50 : 0"\n')
-
-		setupTest('/guest_bathroom/vent/set', '0', done)
-
-		global.changeProcessor([rule], {}, '/environment/vents', '0')
-
-	}).timeout(500) */
-
-})
-/* 
-describe('delay tests', function() {
-	before(function() {
-		// runs before all tests in this block
-		global.clearQueues()
 	})
 
-	this.slow(10500)
-
-	it('test motion should trigger light on, then off 10s later', function(done) {
-		this.slow(10500)
-		const rule = generateRule(
-			'some_bathroom_lights_motion_09: \n\
-    watch: \n\
-      devices: ["/test/motion"] \n\
-    actions: \n\
-      "/test/lights/set": "/test/motion" \n\
-    delayed_actions: \n\
-      delay: 10 \n\
-      actions: \n\
-        "/test/lights/set": "0" ')
-
-		setupTest('/test/lights/set', '1', function() {
-			setupTest('/test/lights/set', '0', done, 10)
-		})
-
-		global.changeProcessor([rule], {}, '/test/motion', '1')
-	}).timeout(12000)
-
-	it('test motion should trigger light on, motion again 5s later, then off 10s later', function(done) {
-		this.slow(16000)
-		const rule = generateRule(
-			'some_bathroom_lights_motion_trigger_random: \n\
-    watch: \n\
-      devices: ["/test/motion"] \n\
-    actions: \n\
-      "/test/lights/set": "/test/motion" \n\
-    delayed_actions: \n\
-      delay: 10 \n\
-      actions: \n\
-        "/test/lights/set": "0" ')
-
-		setupTest('/test/lights/set', '1', function() {
-			setupTest('/test/lights/set', '0', done, 15)
-		})
-
-		global.changeProcessor([rule], {}, '/test/motion', '1')
-
-		setTimeout(function() {
-			global.changeProcessor([rule], {}, '/test/motion', '1')
-		}, 5000)
-
-	}).timeout(17000)
-
-	it('delayed evaluate of 2s', function(done) {
-		this.slow(2200)
-		const rule = generateRule(
-			'test_guest_bathroom_motion_off: \n\
-            evaluate_after: 2 \n\
-            watch: \n\
-              devices: ["/test/guest_bathroom/motion"] \n\
-            rules: \n\
-              expression: "/test/guest_bathroom/motion == 0" \n\
-            actions: \n\
-              "/test/zones/guest_bathroom": "0" \n')
-
-		setupTest('/test/zones/guest_bathroom', '0', done, 2)
-
-		global.changeProcessor([rule], {}, '/test/guest_bathroom/motion', '0')
-	}).timeout(4000)
-
 })
-
-describe('time based triggers', function() {
-	before(function() {
-		// runs before all tests in this block
-		global.setOverrideContext(null)
-		global.clearQueues()
-	})
-
-	this.slow(1200)
-
-	it('test if a trigger can fire at sunset', function(done) {
-		done()
-	}).timeout(60000)
-
-	it('test if a trigger can fire inside a minute', function(done) {
-		this.slow(16000)
-		const rule = generateRule(
-			'test_timed_rule: \n\
-  schedule: \n\
-    soon: "2 * * * * *" \n\
-  actions: \n\
-    "/test/timer/fired": "1"')
-			
-		testScheduler(rule)
-		
-		setupTest('/test/timer/fired', '1', done, 1)
-
-	}).timeout(5000)
-
-	it('test if a trigger can check values', function(done) {
-		this.slow(16000)
-		const rule = generateRule(
-			'test_timed_rule_with_value: \n\
-  schedule: \n\
-    soon: " * * * * *" \n\
-  actions: \n\
-    "/test/timer/print_value": "/test/timer/some_value"')
-
-		const context = {
-			'/test/timer/some_value': '42',
-		}
-    
-		global.setOverrideContext(context)
-		
-		testScheduler(rule)
-		
-		setupTest('/test/timer/print_value', '42', done, 1)
-
-	}).timeout(5000)
-})
-
-describe('custom handlers', function() {
-	before(function() {
-		// runs before all tests in this block
-		global.setOverrideContext(null)
-		global.clearQueues()
-	})
-
-	this.slow(1200)
-
-	it('test NaN null', function(done) {
-		this.slow(16000)
-
-		const rule = generateRule(
-			'test_nan_null: \n\
-            watch: \n\
-              devices: ["/test/nil/value"] \n\
-            actions: \n\
-              "/test/nil/result": "/test/nil/value|isNaN" \n')
-
-
-		testScheduler(rule)
-		
-		setupTest('/test/nil/result', 'true', done, 1)
-
-		global.changeProcessor([rule], {}, '/test/nil/value', 'hello')
-
-	}).timeout(5000)
-
-	it('test NaN empty', function(done) {
-		this.slow(16000)
-
-		const rule = generateRule(
-			'test_nan_null: \n\
-            watch: \n\
-              devices: ["/test/nil/value"] \n\
-            actions: \n\
-              "/test/nil/result": "/test/nil/value|isNaN" \n')
-
-
-		testScheduler(rule)
-		
-		setupTest('/test/nil/result', 'true', done, 1)
-
-		global.changeProcessor([rule], {}, '/test/nil/value', '')
-
-	}).timeout(5000)
-})
- */

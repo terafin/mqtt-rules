@@ -1,12 +1,10 @@
 // Requirements
 const mqtt = require('mqtt')
-const Redis = require('redis')
 const async = require('async')
 const _ = require('lodash')
 const mqtt_wildcard = require('mqtt-wildcard')
 
 const logging = require('homeautomation-js-lib/logging.js')
-const metrics = require('homeautomation-js-lib/stats.js')
 const health = require('homeautomation-js-lib/health.js')
 
 require('homeautomation-js-lib/devices.js')
@@ -17,6 +15,7 @@ var collectedMQTTTChanges = null
 
 const rules = require('./lib/loading.js')
 const api = require('./lib/api.js')
+const variables = require('./lib/variables.js')
 const utilities = require('./lib/utilities.js')
 const schedule = require('./lib/scheduled-jobs.js')
 const evaluation = require('./lib/evaluation.js')
@@ -37,8 +36,8 @@ global.isTestMode = function() {
 	return is_test_mode
 }
 const startCollectingMQTTChanges = function() {
-	if ( _.isNil(collectedMQTTTChanges) ) {
-		collectedMQTTTChanges = {} 
+	if (_.isNil(collectedMQTTTChanges)) {
+		collectedMQTTTChanges = {}
 	}
 }
 
@@ -54,35 +53,30 @@ const stopCollectingMQTTChanges = function() {
 	collectedMQTTTChanges = null
 }
 
-const handleRedisConnection = function() {
-	logging.info(' Redis Connected')
-	handleConnectionEvent()
-}
-
 const handleMQTTConnection = function() {
 	if (is_test_mode === false) {
 		global.client.on('message', (topic, message) => {
-			if ( isCollectingMQTTChanges() ) {
+			if (isCollectingMQTTChanges()) {
 				logging.info(' * pending processing update for: ' + topic + '  => (handling in bulk)')
 				collectChange(topic, message)
 				return
 			}
 			var foundMatch = null
 			global.devices_to_monitor.forEach(deviceToMontor => {
-				if ( !_.isNil(foundMatch) ) {
-					return 
+				if (!_.isNil(foundMatch)) {
+					return
 				}
-	
+
 				const match = mqtt_wildcard(topic, deviceToMontor)
-				if ( !_.isNil(match) ) {
+				if (!_.isNil(match)) {
 					foundMatch = match
 				}
 			})
-			
-			if ( _.isNil(foundMatch) ) {
+
+			if (_.isNil(foundMatch)) {
 				return
 			}
-	
+
 			logging.debug('incoming topic message: ' + topic)
 
 			global.generateContext(topic, message, function(outTopic, outMessage, context) {
@@ -100,10 +94,10 @@ const handleMQTTConnection = function() {
 }
 
 const disconnectionEvent = function() {
-	if ( !_.isNil(global.client) && global.client.connected && global.redis.connected ) {
+	if (!_.isNil(global.client) && global.client.connected ) {
 		return
 	}
-    
+
 	health.unhealthyEvent()
 	logging.error(' Disconnected from redis or MQTT')
 	startCollectingMQTTChanges()
@@ -119,7 +113,7 @@ const connectionProcessor = function() {
 		const message = collectedMQTTTChanges[topic]
 
 		global.generateContext(topic, message, function(outTopic, outMessage, context) {
-			if ( _.isNil(outTopic) || _.isNil(outMessage) ) {
+			if (_.isNil(outTopic) || _.isNil(outMessage)) {
 				logging.error(' *** NOT Processing rules for: ' + topic)
 				logging.error('                     outTopic: ' + outTopic)
 				logging.error('                   outMessage: ' + outMessage)
@@ -135,13 +129,13 @@ const connectionProcessor = function() {
 }
 
 const handleConnectionEvent = function() {
-	if ( _.isNil(global.client) || !global.client.connected ) { 
-		return 
-	}
-	if ( !global.redis.connected ) { 
+	if (_.isNil(global.client) || !global.client.connected) {
 		return
 	}
-    
+	if (!variables.isInitialStateLoaded()) {
+		return
+	}
+
 	logging.info(' Both are good to go - kicking connection processing in ' + connectionProcessorDelay)
 	health.healthyEvent()
 
@@ -149,10 +143,10 @@ const handleConnectionEvent = function() {
 }
 
 const handleSubscriptions = function() {
-    
+
 	if (is_test_mode === false) {
-		if ( _.isNil(global.client) || !global.client.connected ) { 
-			return 
+		if (_.isNil(global.client) || !global.client.connected) {
+			return
 		}
 
 		global.client.unsubscribe('#')
@@ -165,7 +159,7 @@ const handleSubscriptions = function() {
 }
 
 const setupMQTT = function() {
-	if ( !_.isNil(global.client) ) {
+	if (!_.isNil(global.client)) {
 		return
 	}
 
@@ -181,25 +175,27 @@ const setupMQTT = function() {
 global.publishEvents = []
 
 global.publish = function(rule_name, expression, valueOrExpression, topic, message, inOptions) {
-	var options = {retain: false}
+	var options = {
+		retain: false
+	}
 	var quiet = false
 
 	if (!_.isNil(inOptions)) {
-		if ( !_.isNil(inOptions.quiet) ) { 
-			quiet = inOptions.quiet 
+		if (!_.isNil(inOptions.quiet)) {
+			quiet = inOptions.quiet
 		}
 
 		Object.keys(inOptions).forEach(function(key) {
 			options[key] = inOptions[key]
 		})
 	}
-	
-	if ( !quiet && !global.isTestMode() ) { 
-		logging.info('=> rule: ' + rule_name + '  publishing: ' + topic + ':' + message + ' (expression: ' + expression + ' | value: ' + valueOrExpression + ')' + '  options: ' + JSON.stringify(inOptions)) 
+
+	if (!quiet && !global.isTestMode()) {
+		logging.info('=> rule: ' + rule_name + '  publishing: ' + topic + ':' + message + ' (expression: ' + expression + ' | value: ' + valueOrExpression + ')' + '  options: ' + JSON.stringify(inOptions))
 	}
 
-	if ( _.isNil(global.client) ) {
-		logging.error('=> (client not initialized, not publishing) rule: ' + rule_name + '  publishing: ' + topic + ':' + message + ' (expression: ' + expression + ' | value: ' + valueOrExpression + ')' + '  options: ' + JSON.stringify(inOptions)) 
+	if (_.isNil(global.client)) {
+		logging.error('=> (client not initialized, not publishing) rule: ' + rule_name + '  publishing: ' + topic + ':' + message + ' (expression: ' + expression + ' | value: ' + valueOrExpression + ')' + '  options: ' + JSON.stringify(inOptions))
 	} else {
 		global.client.publish(topic, message, options)
 	}
@@ -208,8 +204,12 @@ global.publish = function(rule_name, expression, valueOrExpression, topic, messa
 global.devices_to_monitor = []
 
 global.changeProcessor = function(rules, context, topic, message) {
-	if ( _.isNil(context) ) { context = {} }
+	variables.update(topic, message)
 
+	if (_.isNil(context)) {
+		context = {}
+	}
+	
 	context[utilities.update_topic_for_expression(topic)] = message
 
 	const firstRun = context['firstRun']
@@ -220,13 +220,13 @@ global.changeProcessor = function(rules, context, topic, message) {
 	})
 
 	var ruleProcessor = function(rule, rule_name, callback) {
-		if ( _.isNil(rule) ) {
+		if (_.isNil(rule)) {
 			logging.error('empty rule passed, with name: ' + rule_name)
 			return
 		}
 		const skipFirstRun = _.isNil(rule.skip_first_run) ? false : rule.skip_first_run
 
-		if ( firstRun && skipFirstRun ) {
+		if (firstRun && skipFirstRun) {
 			logging.debug(' skipping rule, due to first run skip: ' + rule_name)
 			return
 		}
@@ -238,24 +238,25 @@ global.changeProcessor = function(rules, context, topic, message) {
 			return
 		}
 
-		const watch = rule.watch
+		const devicesToWatch = getDevicesToWatchForRule(rule)
+		logging.debug('rule: ' + rule_name + '   to watch: ' + devicesToWatch)
 
-		if (!_.isNil(watch) && !_.isNil(watch.devices)) {
+		if (!_.isNil(devicesToWatch)) {
 			var foundMatch = null
 
-			watch.devices.forEach(deviceToWatch => {
-				if ( !_.isNil(foundMatch) ) {
-					return 
+			devicesToWatch.forEach(deviceToWatch => {
+				if (!_.isNil(foundMatch)) {
+					return
 				}
-    
+
 				const match = mqtt_wildcard(topic, deviceToWatch)
-				if ( !_.isNil(match) ) {
+				if (!_.isNil(match)) {
 					foundMatch = match
 				}
 			})
-    
-            
-			if ( !_.isNil(foundMatch) ) {
+
+
+			if (!_.isNil(foundMatch)) {
 				logging.debug('matched topic to rule', {
 					action: 'rule-match',
 					rule_name: rule_name,
@@ -267,7 +268,7 @@ global.changeProcessor = function(rules, context, topic, message) {
 
 				evaluation.evalulateValue(topic, context, rule_name, rule, false)
 			} else {
-				logging.debug(' skipping rule, no match for devices in : ' + rule_name +  '    watch: ' + rule.watch.devices)
+				logging.debug(' skipping rule, no match for devices in : ' + rule_name)
 			}
 		} else {
 			logging.debug(' skipping rule, no devices to watch: ' + JSON.stringify(rule))
@@ -289,66 +290,40 @@ global.changeProcessor = function(rules, context, topic, message) {
 	})
 }
 
-var overrideContext = null
-global.setOverrideContext = function(inContext) {
-	overrideContext = inContext
-}
-
 global.generateContext = function(topic, inMessage, callback) {
-	if ( _.isNil(callback)) {
-		return 
+	if (_.isNil(callback)) {
+		return
 	}
-    
-	var message = utilities.convertToNumberIfNeeded(inMessage)
-	const redisStartTime = new Date().getTime()
-	logging.debug(' redis query', {
-		action: 'redis-query-start',
-		start_time: redisStartTime
-	})
 
+	var message = utilities.convertToNumberIfNeeded(inMessage)
 	var devices_to_monitor = global.devices_to_monitor
 
-	if ( !_.isNil(topic) && !devices_to_monitor.includes(topic) ) {
+	if (!_.isNil(topic) && !devices_to_monitor.includes(topic)) {
 		logging.debug('devices_to_monitor query missing: ' + topic)
 		devices_to_monitor.push(topic)
 	}
 
-	if ( !_.isNil(overrideContext) ) {
-		devices_to_monitor = Object.keys(overrideContext)
-		logging.debug('generating context from override: ' + JSON.stringify(overrideContext))
-	} else if ( is_test_mode == true ) {
-		callback(topic, message, {})
-		return
-	}
+	const valueMap = variables.valuesForTopics(devices_to_monitor)
 
-	const processResults = function(err, values) {
-		const redisQueryTime = ((new Date().getTime()) - redisStartTime)
-		logging.debug(' redis query done', {
-			action: 'redis-query-done',
-			query_time: redisQueryTime
-		})
-
-		metrics.submit('redis_query_time', redisQueryTime)
-
+	if ( !_.isNil(valueMap) ) {
 		var context = {}
 
-		for (var index = 0; index < devices_to_monitor.length; index++) {
-			const key = devices_to_monitor[index]
-			// bug here with index
-			const value = values[index]
-			const newKey = utilities.update_topic_for_expression(key)
+		Object.keys(valueMap).forEach(resultTopic => {
+			const key = resultTopic
+			const value = valueMap[resultTopic]
+			const newKey = utilities.update_topic_for_expression(resultTopic)
 
 			// If for some reason we passed in a null message, let's see waht redis has to say here
 			if (key === topic && _.isNil(message)) {
 				message = utilities.convertToNumberIfNeeded(value)
 			}
-            
-			if (key === topic) { 
+
+			if (key === topic) {
 				context[newKey] = utilities.convertToNumberIfNeeded(message)
 			} else {
-				context[newKey] = utilities.convertToNumberIfNeeded(value) 
+				context[newKey] = utilities.convertToNumberIfNeeded(value)
 			}
-		}
+		})
 
 		try {
 			var jsonFound = JSON.parse(message)
@@ -360,42 +335,87 @@ global.generateContext = function(topic, inMessage, callback) {
 		} catch (err) {
 			logging.debug('invalid json')
 		}
-
-		if ( !_.isNil(overrideContext) ) {
-			logging.debug('generated context from override: ' + JSON.stringify(context))
-			logging.debug('             devices_to_monitor: ' + JSON.stringify(devices_to_monitor))
-		}
-    
-		callback(topic, message, context)
 	}
-    
-	if ( _.isNil(overrideContext)) {
-		global.redis.mget(devices_to_monitor, processResults)
-	} else {
-		var keys = Object.keys(overrideContext)
-		var values = keys.map(function(v) {
-			return overrideContext[v] 
-		})
 
-		processResults(null, values)
+	if ( !_.isNil(callback) ) {
+		return callback(topic, message, context)
 	}
 }
 
-global.redis = Redis.setupClient(function() {
-	if (is_test_mode == false) {
-		logging.debug('loading rules')
-		rules.load_path(config_path)
-	} else {
-		logging.debug('not - loading rules')
+const getDevicesToWatchForRule = function(rule) {
+	if ( _.isNil(rule) ) { 
+		return
 	}
 
-	handleRedisConnection()
-}, function() {
-	logging.info('redis disconnected ', {
-		action: 'redis-disconnected'
-	})
-	disconnectionEvent()
-})
+
+	const watch = rule.watch
+	if (!_.isNil(watch)) {
+		var associatedDevices = []
+
+		const devices = watch.devices
+		if (!_.isNil(devices)) {
+			devices.forEach(function(device) {
+				associatedDevices.push(device)
+			})
+		}
+
+		return associatedDevices
+	}
+
+	return getAssociatedDevicesFromRule(rule)
+}
+
+const getAssociatedDevicesFromRule = function(rule) {
+	if ( _.isNil(rule) ) { 
+		return
+	}
+
+	var associatedDevices = []
+
+	const watch = rule.watch
+	if (!_.isNil(watch)) {
+		const devices = watch.devices
+		if (!_.isNil(devices)) {
+			devices.forEach(function(device) {
+				global.devices_to_monitor.push(device)
+			})
+		}
+	}
+
+	const rules = rule.rules
+
+	if (!_.isNil(rules)) {
+		const expression = rules.expression
+		logging.debug('expression :' + expression)
+		if (!_.isNil(expression)) {
+
+			var foundDevices = expression.match(/\/([a-z,0-9,\-,_,/])*/g)
+
+			if (!_.isNil(foundDevices)) {
+				foundDevices.forEach(function(device) {
+					associatedDevices.push(device)
+				})
+			}
+		}
+	}
+
+	const actions = rule.actions
+	if (!_.isNil(actions)) {
+		Object.keys(actions).forEach(function(action) {
+			const action_value = actions[action]
+
+			var foundDevices = action_value.match(/\/([a-z,0-9,\-,_,/])*/g)
+
+			if (!_.isNil(foundDevices)) {
+				foundDevices.forEach(function(device) {
+					associatedDevices.push(device)
+				})
+			}
+		})
+	}
+
+	return associatedDevices
+}
 
 rules.on('rules-loaded', () => {
 	if (is_test_mode == true) {
@@ -406,49 +426,13 @@ rules.on('rules-loaded', () => {
 	logging.info('Loading rules')
 
 	global.devices_to_monitor = []
+	global.ruleToDevicesMap = {}
 
 	rules.ruleIterator(function(rule_name, rule) {
-		const watch = rule.watch
-		if (!_.isNil(watch)) {
-			const devices = watch.devices
-			if (!_.isNil(devices)) {
-				devices.forEach(function(device) {
-					global.devices_to_monitor.push(device)
-				})
-			}
+		var associatedDevices = getAssociatedDevicesFromRule(rule)
+		if ( !_.isNil(associatedDevices) ) {
+			global.devices_to_monitor = _.concat(associatedDevices, global.devices_to_monitor)
 		}
-
-		const rules = rule.rules
-		if (!_.isNil(rules)) {
-			const expression = rules.expression
-			logging.debug('expression :' + expression)
-			if (!_.isNil(expression)) {
-
-				var foundDevices = expression.match(/\/([a-z,0-9,\-,_,/])*/g)
-
-				if (!_.isNil(foundDevices)) {
-					foundDevices.forEach(function(device) {
-						global.devices_to_monitor.push(device)
-					})
-				}
-			}
-		}
-
-		const actions = rule.actions
-		if (!_.isNil(actions)) {
-			Object.keys(actions).forEach(function(action) {
-				const action_value = actions[action]
-
-				var foundDevices = action_value.match(/\/([a-z,0-9,\-,_,/])*/g)
-
-				if (!_.isNil(foundDevices)) {
-					foundDevices.forEach(function(device) {
-						global.devices_to_monitor.push(device)
-					})
-				}
-			})
-		}
-
 	})
 
 	global.devices_to_monitor = utilities.unique(global.devices_to_monitor)
@@ -460,11 +444,20 @@ rules.on('rules-loaded', () => {
 
 	logging.info(' => Rules loaded')
 
-	setupMQTT()
-	schedule.scheduleJobs()
-	api.updateRules(rules)
+	variables.updateObservedTopics(global.devices_to_monitor, function() {
+		setupMQTT()
+		schedule.scheduleJobs()
+		api.updateRules(rules)
+	})
 })
 
 global.clearQueues = function() {
 	evaluation.clearQueues()
+}
+
+if (is_test_mode == false) {
+	logging.debug('loading rules')
+	rules.load_path(config_path)
+} else {
+	logging.debug('not - loading rules')
 }
