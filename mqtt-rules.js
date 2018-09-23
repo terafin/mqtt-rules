@@ -232,45 +232,71 @@ const cacheRulesForTopic = function(topic, rules) {
 	ruleMapCache[topic] = rules
 }
 
-const getRulesTriggeredBy = function(rules, topic) {
-	if ( _.isNil(rules) ) {
-		rules = rule_loader.get_configs()
+const getRulesTriggeredBy = function(inRuleSets, topic) {
+	var allRuleSets = inRuleSets
+
+	if ( _.isNil(allRuleSets) ) {
+		allRuleSets = rule_loader.get_configs()
+	}
+	
+	if ( _.isNil(allRuleSets) ) {
+		logging.error('empty rules')
+		return null
 	}
 	
 	const existingRecord = cachedRulesForTopic(topic)
 
 	if ( !_.isNil(existingRecord)) {
-		logging.info('cache hit for: ' + topic)
+		logging.debug('cache hit for: ' + topic)
 		return existingRecord
 	}
 
 	var foundRules = {}
-	const configKeys = Object.keys(rules)
+	allRuleSets.forEach(ruleSet => {
+		if ( _.isNil(ruleSet)) { 
+			logging.error('null rule set?')
+			return 
+		}
 
-	configKeys.forEach(configKey => {
-		const config = rules[configKey]
-		const ruleKeys = Object.keys(config)
-		ruleKeys.forEach(rule_name => {
-			const rule = config[rule_name]
-			const devicesToWatch = getDevicesToWatchForRule(rule)
-			logging.debug('rule: ' + rule_name + '   to watch: ' + devicesToWatch)
-		
-			if (!_.isNil(devicesToWatch)) {
-				var foundMatch = null
-		
-				devicesToWatch.forEach(deviceToWatch => {
-					if (!_.isNil(foundMatch)) {
-						return
-					}
-		
-					const match = mqtt_wildcard(topic, deviceToWatch)
-					if (!_.isNil(match)) {
-						foundRules[rule_name] = rule
-					}
-				})
+		const configKeys = Object.keys(ruleSet)
+
+		logging.debug('rule set: ' + configKeys)
+
+		if ( _.isNil(configKeys)) { 
+			return 
+		}
+
+		configKeys.forEach(configKey => {
+			const config = ruleSet[configKey]
+			if ( _.isNil(config) ) { 
+				logging.error('empty config for key: ' + configKey)
+				return 
 			}
+
+			const ruleKeys = Object.keys(config)
+			ruleKeys.forEach(rule_name => {
+				const rule = config[rule_name]
+				const devicesToWatch = getDevicesToWatchForRule(rule)
+				logging.debug('rule: ' + rule_name + '   to watch: ' + devicesToWatch)
+		
+				if (!_.isNil(devicesToWatch)) {
+					var foundMatch = null
+		
+					devicesToWatch.forEach(deviceToWatch => {
+						if (!_.isNil(foundMatch)) {
+							return
+						}
+		
+						const match = mqtt_wildcard(topic, deviceToWatch)
+						if (!_.isNil(match)) {
+							foundRules[rule_name] = rule
+						}
+					})
+				}
+			})
 		})
 	})
+
 	logging.debug('rules for: ' + topic + '   found: ' + foundRules)
 
 	cacheRulesForTopic(topic, foundRules)
@@ -486,9 +512,16 @@ rule_loader.on('rules-loaded', () => {
 		
 		if ( !_.isNil(triggerDevices)) {
 			triggerDevices.forEach(topic => {
-				cacheRulesForTopic(topic, rule)
+				var cachedRules = cachedRulesForTopic(topic)
+				if ( _.isNil(cachedRules)) {
+					cachedRules = {}
+				}
+				
+				cachedRules[rule_name] = rule
+				cacheRulesForTopic(topic, cachedRules)
 			})
 		}
+
 		if ( !_.isNil(associatedDevices) ) {
 			global.devices_to_monitor = _.concat(associatedDevices, global.devices_to_monitor)
 		}
