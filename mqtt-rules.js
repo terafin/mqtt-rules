@@ -481,7 +481,7 @@ rule_loader.on('rules-loaded', () => {
 	global.devices_to_monitor = []
 	clearRuleMapCache()
 
-	rules.ruleIterator(function(rule_name, rule) {
+	rule_loader.ruleIterator(function(rule_name, rule) {
 		var triggerDevices = getDevicesToWatchForRule(rule)
 		
 		if ( !_.isNil(triggerDevices)) {
@@ -511,7 +511,7 @@ rule_loader.on('rules-loaded', () => {
 	variables.updateObservedTopics(global.devices_to_monitor, function() {
 		setupMQTT()
 		schedule.scheduleJobs()
-		api.updateRules(rules)
+		api.updateRules(rule_loader)
 	})
 })
 
