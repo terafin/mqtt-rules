@@ -1,4 +1,6 @@
 const utilities = require('../lib/utilities.js')
+const rules = require('../lib/loading.js')
+
 const TIMEZONE = utilities.getCurrentTimeZone()
 const _ = require('lodash')
 const logging = require('homeautomation-js-lib/logging.js')
@@ -131,16 +133,20 @@ const testProcessor = function(rule, rule_name, test, test_name) {
 		variables.clearState()
 		variables.updateObservedTopics(allTopics, function() {
 			global.devices_to_monitor = allTopics
+
 			if (!_.isNil(context)) {
 				Object.keys(context).forEach(topic => {
 					variables.update(topic, context[topic])
 				})
 			}
 
+			global.clearRuleMapCache()
+
+			rules.set_override_configs([formattedRule])
 			setupTest(target, done)
 
 			global.generateContext(inputTopic, inputValue, function(outTopic, outMessage, generatedContext) {
-				global.changeProcessor([formattedRule], generatedContext, outTopic, outMessage)
+				global.changeProcessor(null, generatedContext, outTopic, outMessage)
 			})
 		})
 	})

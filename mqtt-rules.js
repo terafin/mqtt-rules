@@ -13,7 +13,7 @@ require('homeautomation-js-lib/redis_helpers.js')
 
 var collectedMQTTTChanges = null
 
-const rules = require('./lib/loading.js')
+const rule_loader = require('./lib/loading.js')
 const api = require('./lib/api.js')
 const variables = require('./lib/variables.js')
 const utilities = require('./lib/utilities.js')
@@ -61,17 +61,20 @@ const handleMQTTConnection = function() {
 				collectChange(topic, message)
 				return
 			}
-			var foundMatch = null
-			global.devices_to_monitor.forEach(deviceToMontor => {
-				if (!_.isNil(foundMatch)) {
-					return
-				}
+			var foundMatch = global.devices_to_monitor.includes(topic)
 
-				const match = mqtt_wildcard(topic, deviceToMontor)
-				if (!_.isNil(match)) {
-					foundMatch = match
-				}
-			})
+			if ( _.isNil(foundMatch)) {
+				global.devices_to_monitor.forEach(deviceToMontor => {
+					if (!_.isNil(foundMatch)) {
+						return
+					}
+
+					const match = mqtt_wildcard(topic, deviceToMontor)
+					if (!_.isNil(match)) {
+						foundMatch = match
+					}
+				})
+			}
 
 			if (_.isNil(foundMatch)) {
 				return
@@ -80,7 +83,7 @@ const handleMQTTConnection = function() {
 			logging.debug('incoming topic message: ' + topic)
 
 			global.generateContext(topic, message, function(outTopic, outMessage, context) {
-				global.changeProcessor(rules.get_configs(), context, topic, message)
+				global.changeProcessor(null, context, topic, message)
 			})
 		})
 	}
@@ -119,7 +122,7 @@ const connectionProcessor = function() {
 				logging.error('                   outMessage: ' + outMessage)
 			} else {
 				context['firstRun'] = true
-				global.changeProcessor(rules.get_configs(), context, outTopic, outMessage)
+				global.changeProcessor(null, context, outTopic, outMessage)
 			}
 		})
 	})
@@ -203,31 +206,110 @@ global.publish = function(rule_name, expression, valueOrExpression, topic, messa
 
 global.devices_to_monitor = []
 
-global.changeProcessor = function(rules, context, topic, message) {
-	variables.update(topic, message)
+global.clearRuleMapCache = function() {
+	clearRuleMapCache()
+}
 
-	if (_.isNil(context)) {
-		context = {}
+var ruleMapCache = {}
+
+const clearRuleMapCache = function() {
+	ruleMapCache = {}
+}
+
+const cachedRulesForTopic = function(topic) {
+	if ( _.isNil(topic)) {
+		return null
+	}
+
+	return ruleMapCache[topic]
+}
+
+const cacheRulesForTopic = function(topic, rules) {
+	if ( _.isNil(topic)) {
+		return null
+	}
+
+	ruleMapCache[topic] = rules
+}
+
+const getRulesTriggeredBy = function(rules, topic) {
+	if ( _.isNil(rules) ) {
+		rules = rule_loader.get_configs()
 	}
 	
-	context[utilities.update_topic_for_expression(topic)] = message
+	const existingRecord = cachedRulesForTopic(topic)
 
-	const firstRun = context['firstRun']
+	if ( !_.isNil(existingRecord)) {
+		logging.info('cache hit for: ' + topic)
+		return existingRecord
+	}
+
+	var foundRules = {}
+	const configKeys = Object.keys(rules)
+
+	configKeys.forEach(configKey => {
+		const config = rules[configKey]
+		const ruleKeys = Object.keys(config)
+		ruleKeys.forEach(rule_name => {
+			const rule = config[rule_name]
+			const devicesToWatch = getDevicesToWatchForRule(rule)
+			logging.debug('rule: ' + rule_name + '   to watch: ' + devicesToWatch)
+		
+			if (!_.isNil(devicesToWatch)) {
+				var foundMatch = null
+		
+				devicesToWatch.forEach(deviceToWatch => {
+					if (!_.isNil(foundMatch)) {
+						return
+					}
+		
+					const match = mqtt_wildcard(topic, deviceToWatch)
+					if (!_.isNil(match)) {
+						foundRules[rule_name] = rule
+					}
+				})
+			}
+		})
+	})
+	logging.debug('rules for: ' + topic + '   found: ' + foundRules)
+
+	cacheRulesForTopic(topic, foundRules)
+
+	return foundRules
+}
+
+global.changeProcessor = function(overrideRules, context, topic, message) {
 	const ruleStartTime = new Date().getTime()
 	logging.debug(' rule processing start ', {
 		action: 'rule-processing-start',
 		start_time: ruleStartTime
 	})
 
+	if (_.isNil(context)) {
+		context = {}
+	}
+	
+	const foundRules = getRulesTriggeredBy(overrideRules, topic)
+	logging.debug('using foundRules: ' + JSON.stringify(foundRules))
+
+	variables.update(topic, message)
+
+	context[utilities.update_topic_for_expression(topic)] = message
+
+	const firstRun = context['firstRun']
 	var ruleProcessor = function(rule, rule_name, callback) {
+		logging.debug('rule name: ' + rule_name + '    rule: ' + JSON.stringify(rule))
+
 		if (_.isNil(rule)) {
 			logging.error('empty rule passed, with name: ' + rule_name)
+			callback()
 			return
 		}
 		const skipFirstRun = _.isNil(rule.skip_first_run) ? false : rule.skip_first_run
 
 		if (firstRun && skipFirstRun) {
 			logging.debug(' skipping rule, due to first run skip: ' + rule_name)
+			callback()
 			return
 		}
 
@@ -235,54 +317,25 @@ global.changeProcessor = function(rules, context, topic, message) {
 
 		if (disabled == true) {
 			logging.info(' skipping rule, rule disabled: ' + rule_name)
+			callback()
 			return
 		}
 
-		const devicesToWatch = getDevicesToWatchForRule(rule)
-		logging.debug('rule: ' + rule_name + '   to watch: ' + devicesToWatch)
+		logging.debug('matched topic to rule', {
+			action: 'rule-match',
+			rule_name: rule_name,
+			topic: topic,
+			message: utilities.convertToNumberIfNeeded(message),
+			rule: rule
+			// context: context
+		})
 
-		if (!_.isNil(devicesToWatch)) {
-			var foundMatch = null
-
-			devicesToWatch.forEach(deviceToWatch => {
-				if (!_.isNil(foundMatch)) {
-					return
-				}
-
-				const match = mqtt_wildcard(topic, deviceToWatch)
-				if (!_.isNil(match)) {
-					foundMatch = match
-				}
-			})
-
-
-			if (!_.isNil(foundMatch)) {
-				logging.debug('matched topic to rule', {
-					action: 'rule-match',
-					rule_name: rule_name,
-					topic: topic,
-					message: utilities.convertToNumberIfNeeded(message),
-					rule: rule
-					// context: context
-				})
-
-				evaluation.evalulateValue(topic, context, rule_name, rule, false)
-			} else {
-				logging.debug(' skipping rule, no match for devices in : ' + rule_name)
-			}
-		} else {
-			logging.debug(' skipping rule, no devices to watch: ' + JSON.stringify(rule))
-		}
+		evaluation.evalulateValue(topic, context, rule_name, rule, false)
 
 		callback()
 	}
 
-	var configProcessor = function(config, callback) {
-		async.eachOf(config, ruleProcessor)
-		callback()
-	}
-
-	async.each(rules, configProcessor)
+	async.eachOf(foundRules, ruleProcessor)
 
 	logging.debug(' rule processing done ', {
 		action: 'rule-processing-done',
@@ -417,7 +470,7 @@ const getAssociatedDevicesFromRule = function(rule) {
 	return associatedDevices
 }
 
-rules.on('rules-loaded', () => {
+rule_loader.on('rules-loaded', () => {
 	if (is_test_mode == true) {
 		logging.debug('test mode, not loading rules')
 		return
@@ -426,9 +479,20 @@ rules.on('rules-loaded', () => {
 	logging.info('Loading rules')
 
 	global.devices_to_monitor = []
-	global.ruleToDevicesMap = {}
+	clearRuleMapCache()
 
 	rules.ruleIterator(function(rule_name, rule) {
+		var triggerDevices = getDevicesToWatchForRule(rule)
+		
+		if ( !_.isNil(triggerDevices)) {
+			triggerDevices.forEach(topic => {
+				cacheRulesForTopic(topic, rule)
+			})
+		}
+		if ( !_.isNil(associatedDevices) ) {
+			global.devices_to_monitor = _.concat(associatedDevices, global.devices_to_monitor)
+		}
+
 		var associatedDevices = getAssociatedDevicesFromRule(rule)
 		if ( !_.isNil(associatedDevices) ) {
 			global.devices_to_monitor = _.concat(associatedDevices, global.devices_to_monitor)
