@@ -142,7 +142,7 @@ const testProcessor = function(rule, rule_name, test, test_name) {
 
 			global.clearRuleMapCache()
 
-			rules.set_override_configs([formattedRule])
+			rules.set_override_configs([{test: formattedRule}])
 			setupTest(target, done)
 
 			global.generateContext(inputTopic, inputValue, function(outTopic, outMessage, generatedContext) {
