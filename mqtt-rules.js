@@ -521,7 +521,7 @@ global.clearQueues = function() {
 
 if (is_test_mode == false) {
 	logging.debug('loading rules')
-	rules.load_path(config_path)
+	rule_loader.load_path(config_path)
 } else {
 	logging.debug('not - loading rules')
 }
