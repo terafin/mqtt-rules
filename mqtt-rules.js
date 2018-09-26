@@ -444,6 +444,10 @@ const getDevicesToWatchForRule = function(rule) {
 	return getAssociatedDevicesFromRule(rule)
 }
 
+global.getAssociatedDevicesFromRule = function(rule) {
+	return getAssociatedDevicesFromRule(rule)
+}
+
 const getAssociatedDevicesFromRule = function(rule) {
 	if ( _.isNil(rule) ) { 
 		return
@@ -481,6 +485,9 @@ const getAssociatedDevicesFromRule = function(rule) {
 	const actions = rule.actions
 	if (!_.isNil(actions)) {
 		Object.keys(actions).forEach(function(action) {
+			if ( action == 'if' ) { 
+				return 
+			}
 			const action_value = actions[action]
 
 			var foundDevices = action_value.match(/\/([a-z,0-9,\-,_,/])*/g)
@@ -490,6 +497,23 @@ const getAssociatedDevicesFromRule = function(rule) {
 					associatedDevices.push(device)
 				})
 			}
+		})
+	}
+	const conditional_actions = !_.isNil(rule.actions) ? rule.actions.if : null
+	if (!_.isNil(conditional_actions)) {
+		Object.keys(conditional_actions).forEach(function(conditional_action_name) {
+			const all_actions = conditional_actions[conditional_action_name].actions
+
+			Object.keys(all_actions).forEach(function(action_name) {
+				const action_value = all_actions[action_name]
+				var foundDevices = action_value.match(/\/([a-z,0-9,\-,_,/])*/g)
+
+				if (!_.isNil(foundDevices)) {
+					foundDevices.forEach(function(device) {
+						associatedDevices.push(device)
+					})
+				}
+			})
 		})
 	}
 
