@@ -534,7 +534,6 @@ const getAssociatedDevicesFromRule = function(rule) {
 		})
 	}
 
-	console.log('associated devices: ' + associatedDevices.unique())
 	return associatedDevices.unique()
 }
 
