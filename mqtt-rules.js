@@ -466,7 +466,7 @@ const getAssociatedDevicesFromRule = function(rule) {
 		const devices = watch.devices
 		if (!_.isNil(devices)) {
 			devices.forEach(function(device) {
-				global.devices_to_monitor.push(device)
+				associatedDevices.push(device)
 			})
 		}
 	}
