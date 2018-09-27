@@ -448,6 +448,12 @@ global.getAssociatedDevicesFromRule = function(rule) {
 	return getAssociatedDevicesFromRule(rule)
 }
 
+Array.prototype.unique = function() {
+	return this.filter(function(value, index, self) { 
+		return self.indexOf(value) === index
+	})
+}
+  
 const getAssociatedDevicesFromRule = function(rule) {
 	if ( _.isNil(rule) ) { 
 		return
@@ -485,7 +491,18 @@ const getAssociatedDevicesFromRule = function(rule) {
 	const actions = rule.actions
 	if (!_.isNil(actions)) {
 		Object.keys(actions).forEach(function(action) {
-			if ( action == 'if' ) { 
+			if ( action == 'if' ) {
+				const subExpressions = actions.if
+				const subExpressionKeys = Object.keys(subExpressions)
+
+				subExpressionKeys.forEach(key => {
+					const subExpression = subExpressions[key]
+					const subExpressionDevices = getAssociatedDevicesFromRule(subExpression)
+					subExpressionDevices.forEach(function(device) {
+						associatedDevices.push(device)
+					})
+	
+				})
 				return 
 			}
 			const action_value = actions[action]
@@ -517,7 +534,7 @@ const getAssociatedDevicesFromRule = function(rule) {
 		})
 	}
 
-	return associatedDevices
+	return associatedDevices.unique()
 }
 
 rule_loader.on('rules-loaded', () => {
