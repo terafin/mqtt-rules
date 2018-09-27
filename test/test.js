@@ -132,9 +132,8 @@ const testProcessor = function(rule, rule_name, test, test_name) {
 
 		variables.clearState()
 		variables.updateObservedTopics(allTopics, function() {
-			global.devices_to_monitor = allTopics
-
 			const associatedDevices = global.getAssociatedDevicesFromRule(rule)
+			global.devices_to_monitor = associatedDevices
 
 			if (!_.isNil(associatedDevices)) {
 				Object.keys(associatedDevices).forEach(device => {
