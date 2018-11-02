@@ -15,6 +15,7 @@ var collectedMQTTTChanges = null
 
 const rule_loader = require('./lib/loading.js')
 const api = require('./lib/api.js')
+const queue = require('./lib/queue.js')
 const variables = require('./lib/variables.js')
 const utilities = require('./lib/utilities.js')
 const schedule = require('./lib/scheduled-jobs.js')
@@ -61,6 +62,7 @@ const handleMQTTConnection = function() {
 				collectChange(topic, message)
 				return
 			}
+
 			var foundMatch = global.devices_to_monitor.includes(topic)
 
 			if ( _.isNil(foundMatch)) {
@@ -82,9 +84,25 @@ const handleMQTTConnection = function() {
 
 			logging.debug('incoming topic message: ' + topic)
 
-			global.generateContext(topic, message, function(outTopic, outMessage, context) {
-				global.changeProcessor(null, context, topic, message)
-			})
+			const data = {
+				incoming_topic: topic,
+				incoming_message: message
+			}
+			queue.enqueue('mqtt-incoming', topic, function(job, doneEvaluate) {
+				const queued_topic = job.data.incoming_topic
+				const queued_message = job.data.incoming_message
+				logging.debug('handling queued incoming topic message: ' + topic)
+
+				global.generateContext(queued_topic, queued_message, function(outTopic, outMessage, context) {
+					global.changeProcessor(null, context, queued_topic, queued_message)
+				})
+	
+				if (!_.isNil(doneEvaluate)) {
+					doneEvaluate() 
+				}
+
+			}, data, 50, true, null)
+	
 		})
 	}
 
@@ -200,7 +218,29 @@ global.publish = function(rule_name, expression, valueOrExpression, topic, messa
 	if (_.isNil(global.client)) {
 		logging.error('=> (client not initialized, not publishing) rule: ' + rule_name + '  publishing: ' + topic + ':' + message + ' (expression: ' + expression + ' | value: ' + valueOrExpression + ')' + '  options: ' + JSON.stringify(inOptions))
 	} else {
-		global.client.publish(topic, message, options)
+
+
+		const data = {
+			outgoing_topic: topic,
+			outgoing_message: message,
+			outgoing_options: options
+		}
+		logging.debug(' queue publish : ' + topic)
+
+		queue.enqueue('mqtt-publish', topic, function(job, doneEvaluate) {
+			const queued_topic = job.data.outgoing_topic
+			const queued_message = job.data.outgoing_message
+			const queued_options = job.data.outoging_options
+			logging.debug(' queued FIRE publish : ' + topic)
+
+			global.client.publish(queued_topic, queued_message, queued_options)
+
+			if (!_.isNil(doneEvaluate)) {
+				doneEvaluate() 
+			}
+
+		}, data, 50, true, null)
+
 	}
 }
 
