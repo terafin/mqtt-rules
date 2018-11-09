@@ -314,7 +314,7 @@ const getRulesTriggeredBy = function(inRuleSets, topic) {
 			}
 
 			const devicesToWatch = getDevicesToWatchForRule(rule)
-			logging.info('rule: ' + rule_name + '   to watch: ' + devicesToWatch)
+			logging.debug('rule: ' + rule_name + '   to watch: ' + devicesToWatch)
 		
 			if (!_.isNil(devicesToWatch)) {
 				var foundMatch = null
