@@ -306,34 +306,30 @@ const getRulesTriggeredBy = function(inRuleSets, topic) {
 			return 
 		}
 
-		configKeys.forEach(configKey => {
-			const config = ruleSet[configKey]
-			if ( _.isNil(config) ) { 
-				logging.error('empty config for key: ' + configKey)
+		configKeys.forEach(rule_name => {
+			const rule = ruleSet[rule_name]
+			if ( _.isNil(rule) ) { 
+				logging.error('empty rule for rule_name: ' + rule_name)
 				return 
 			}
 
-			const ruleKeys = Object.keys(config)
-			ruleKeys.forEach(rule_name => {
-				const rule = config[rule_name]
-				const devicesToWatch = getDevicesToWatchForRule(rule)
-				logging.debug('rule: ' + rule_name + '   to watch: ' + devicesToWatch)
+			const devicesToWatch = getDevicesToWatchForRule(rule)
+			logging.info('rule: ' + rule_name + '   to watch: ' + devicesToWatch)
 		
-				if (!_.isNil(devicesToWatch)) {
-					var foundMatch = null
+			if (!_.isNil(devicesToWatch)) {
+				var foundMatch = null
 		
-					devicesToWatch.forEach(deviceToWatch => {
-						if (!_.isNil(foundMatch)) {
-							return
-						}
+				devicesToWatch.forEach(deviceToWatch => {
+					if (!_.isNil(foundMatch)) {
+						return
+					}
 		
-						const match = mqtt_wildcard(topic, deviceToWatch)
-						if (!_.isNil(match)) {
-							foundRules[rule_name] = rule
-						}
-					})
-				}
-			})
+					const match = mqtt_wildcard(topic, deviceToWatch)
+					if (!_.isNil(match)) {
+						foundRules[rule_name] = rule
+					}
+				})
+			}
 		})
 	})
 
