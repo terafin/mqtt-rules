@@ -82,7 +82,7 @@ const handleMQTTConnection = function() {
 				return
 			}
 
-			logging.debug('incoming topic message: ' + topic)
+			logging.debug('incoming topic message: ' + topic + '  message: ' + message)
 
 			const data = {
 				incoming_topic: topic,
@@ -91,7 +91,7 @@ const handleMQTTConnection = function() {
 			queue.enqueue('mqtt-incoming', topic, function(job, doneEvaluate) {
 				const queued_topic = job.data.incoming_topic
 				const queued_message = job.data.incoming_message
-				logging.debug('handling queued incoming topic message: ' + topic)
+				logging.debug('handling queued incoming topic message: ' + queued_topic + ' message: ' + queued_message)
 
 				global.generateContext(queued_topic, queued_message, function(outTopic, outMessage, context) {
 					global.changeProcessor(null, context, queued_topic, queued_message)
@@ -225,13 +225,13 @@ global.publish = function(rule_name, expression, valueOrExpression, topic, messa
 			outgoing_message: message,
 			outgoing_options: options
 		}
-		logging.debug(' queue publish : ' + topic)
+		logging.debug(' queue publish : ' + topic + '  message: ' + message)
 
 		queue.enqueue('mqtt-publish', topic, function(job, doneEvaluate) {
 			const queued_topic = job.data.outgoing_topic
 			const queued_message = job.data.outgoing_message
 			const queued_options = job.data.outoging_options
-			logging.debug(' queued FIRE publish : ' + topic)
+			logging.debug(' queued FIRE publish : ' + queued_topic + '  message: ' + queued_message)
 
 			global.client.publish(queued_topic, queued_message, queued_options)
 
@@ -287,7 +287,6 @@ const getRulesTriggeredBy = function(inRuleSets, topic) {
 	const existingRecord = cachedRulesForTopic(topic)
 
 	if ( !_.isNil(existingRecord)) {
-		logging.debug('cache hit for: ' + topic)
 		return existingRecord
 	}
 
@@ -351,8 +350,14 @@ global.changeProcessor = function(overrideRules, context, topic, message) {
 		context = {}
 	}
 	
+
+	logging.debug('Begin Change Processor')
+
 	const foundRules = getRulesTriggeredBy(overrideRules, topic)
-	logging.debug('using foundRules: ' + JSON.stringify(foundRules))
+	logging.debug('      topic: ' + topic)
+	logging.debug('    message: ' + message)
+	logging.debug('      rules: ' + Object.keys(foundRules))
+	logging.debug('    context: ' + JSON.stringify(context))
 
 	variables.update(topic, message)
 
@@ -360,17 +365,18 @@ global.changeProcessor = function(overrideRules, context, topic, message) {
 
 	const firstRun = context['firstRun']
 	var ruleProcessor = function(rule, rule_name, callback) {
-		logging.debug('rule name: ' + rule_name + '    rule: ' + JSON.stringify(rule))
+		logging.debug('processing rule: ' + rule_name)
+		logging.debug('    rule config: ' + JSON.stringify(rule))
 
 		if (_.isNil(rule)) {
-			logging.error('empty rule passed, with name: ' + rule_name)
+			logging.error(' * empty rule passed, with name: ' + rule_name)
 			callback()
 			return
 		}
 		const skipFirstRun = _.isNil(rule.skip_first_run) ? false : rule.skip_first_run
 
 		if (firstRun && skipFirstRun) {
-			logging.debug(' skipping rule, due to first run skip: ' + rule_name)
+			logging.debug(' * skipping rule, due to first run skip: ' + rule_name)
 			callback()
 			return
 		}
@@ -378,7 +384,7 @@ global.changeProcessor = function(overrideRules, context, topic, message) {
 		const disabled = rule.disabled
 
 		if (disabled == true) {
-			logging.info(' skipping rule, rule disabled: ' + rule_name)
+			logging.info(' * skipping rule, rule disabled: ' + rule_name)
 			callback()
 			return
 		}
@@ -392,7 +398,10 @@ global.changeProcessor = function(overrideRules, context, topic, message) {
 			// context: context
 		})
 
+
 		evaluation.evalulateValue(topic, context, rule_name, rule, false)
+
+		logging.debug(' * done, dispatched rule: ' + rule_name)
 
 		callback()
 	}
@@ -403,6 +412,8 @@ global.changeProcessor = function(overrideRules, context, topic, message) {
 		action: 'rule-processing-done',
 		processing_time: ((new Date().getTime()) - ruleStartTime)
 	})
+
+	logging.debug(' => End Change Processor')
 }
 
 global.generateContext = function(topic, inMessage, callback) {
@@ -448,7 +459,7 @@ global.generateContext = function(topic, inMessage, callback) {
 				})
 			}
 		} catch (err) {
-			logging.debug('invalid json')
+			// eslint-disable-next-line
 		}
 	}
 
