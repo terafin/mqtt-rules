@@ -174,7 +174,7 @@ const handleSubscriptions = function() {
 
 		global.devices_to_monitor.forEach(topic => {
 			logging.debug(' => subscribing to: ' + topic)
-			global.client.subscribe(topic)
+			global.client.subscribe(topic, {qos: 2})
 		})
 	}
 }
@@ -197,7 +197,8 @@ global.publishEvents = []
 
 global.publish = function(rule_name, expression, valueOrExpression, topic, message, inOptions) {
 	var options = {
-		retain: false
+		retain: false,
+		qos: 2
 	}
 	var quiet = false
 
