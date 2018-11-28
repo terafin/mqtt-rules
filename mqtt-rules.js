@@ -390,14 +390,14 @@ global.changeProcessor = function(overrideRules, context, topic, message) {
 			return
 		}
 
-		logging.debug('matched topic to rule', {
+		logging.debug('matched topic to rule' + 'data:' + JSON.stringify({
 			action: 'rule-match',
 			rule_name: rule_name,
 			topic: topic,
 			message: utilities.convertToNumberIfNeeded(message),
 			rule: rule
 			// context: context
-		})
+		}))
 
 
 		evaluation.evalulateValue(topic, context, rule_name, rule, false)
@@ -409,10 +409,10 @@ global.changeProcessor = function(overrideRules, context, topic, message) {
 
 	async.eachOf(foundRules, ruleProcessor)
 
-	logging.debug(' rule processing done ', {
+	logging.debug(' rule processing done ' + 'data:' + JSON.stringify({
 		action: 'rule-processing-done',
 		processing_time: ((new Date().getTime()) - ruleStartTime)
-	})
+	}))
 
 	logging.debug(' => End Change Processor')
 }
