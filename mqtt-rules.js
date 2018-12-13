@@ -588,43 +588,43 @@ const getAssociatedDevicesFromRule = function(rule) {
 			})
 		})
 	}
-	// const processNotifyBlock = function(notify) {
-	// 	if (!_.isNil(notify)) {
-	// 		const titleDevices = getDevicesFromString(notify.title)
-	// 		const messageDevices = getDevicesFromString(notify.message)
-	// 		const expressionDevices = getDevicesFromString(notify.expression)
+	const processNotifyBlock = function(notify) {
+		if (!_.isNil(notify)) {
+			const titleDevices = getDevicesFromString(notify.title)
+			const messageDevices = getDevicesFromString(notify.message)
+			const expressionDevices = getDevicesFromString(notify.expression)
 	
-	// 		if (!_.isNil(titleDevices)) {
-	// 			titleDevices.forEach(function(device) {
-	// 				associatedDevices.push(device)
-	// 			})
-	// 		}
+			if (!_.isNil(titleDevices)) {
+				titleDevices.forEach(function(device) {
+					associatedDevices.push(device)
+				})
+			}
 	
-	// 		if (!_.isNil(messageDevices)) {
-	// 			messageDevices.forEach(function(device) {
-	// 				associatedDevices.push(device)
-	// 			})
-	// 		}
+			if (!_.isNil(messageDevices)) {
+				messageDevices.forEach(function(device) {
+					associatedDevices.push(device)
+				})
+			}
 	
-	// 		if (!_.isNil(expressionDevices)) {
-	// 			expressionDevices.forEach(function(device) {
-	// 				associatedDevices.push(device)
-	// 			})
-	// 		}
-	// 	}	
-	// }
+			if (!_.isNil(expressionDevices)) {
+				expressionDevices.forEach(function(device) {
+					associatedDevices.push(device)
+				})
+			}
+		}	
+	}
 
-	// if ( !_.isNil(rule.notify)) {
-	// 	processNotifyBlock(rule.notify)
+	if ( !_.isNil(rule.notify)) {
+		processNotifyBlock(rule.notify)
 
-	// 	if ( !_.isNil(rule.notify.if)) {
-	// 		const allNotifyKeys = Object.keys(rule.notify.if)
+		if ( !_.isNil(rule.notify.if)) {
+			const allNotifyKeys = Object.keys(rule.notify.if)
 
-	// 		allNotifyKeys.forEach(notifyKey => {
-	// 			processNotifyBlock(rule.notify.if[notifyKey])
-	// 		})
-	// 	}
-	// }
+			allNotifyKeys.forEach(notifyKey => {
+				processNotifyBlock(rule.notify.if[notifyKey])
+			})
+		}
+	}
 
 	return associatedDevices.unique()
 }
