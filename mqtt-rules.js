@@ -265,6 +265,26 @@ const cachedRulesForTopic = function(topic) {
 	return ruleMapCache[topic]
 }
 
+const isRuleQuiet = function(rule) {
+	var quiet = false
+
+	if ( !_.isNil(rule) && !_.isNil(rule.options) ) {
+		quiet = rule.options.quiet
+	}
+
+	return quiet
+}
+
+const isAnyRuleQuiet = function(rules) {
+	var quiet = false
+
+	rules.forEach(rule => {
+		quiet |= isRuleQuiet(rule)
+	})
+
+	return quiet
+}
+
 const cacheRulesForTopic = function(topic, rules) {
 	if ( _.isNil(topic)) {
 		return null
@@ -273,12 +293,40 @@ const cacheRulesForTopic = function(topic, rules) {
 	ruleMapCache[topic] = rules
 }
 
-const getRulesTriggeredBy = function(inRuleSets, topic) {
-	var allRuleSets = inRuleSets
-
+const getRulesArray = function(allRuleSets) {
 	if ( _.isNil(allRuleSets) ) {
-		allRuleSets = rule_loader.get_configs()
+		logging.error('empty rules')
+		return null
 	}
+	
+	var foundRules = []
+	allRuleSets.forEach(ruleSet => {
+		if ( _.isNil(ruleSet)) { 
+			logging.error('null rule set?')
+			return 
+		}
+
+		const configKeys = Object.keys(ruleSet)
+
+		if ( _.isNil(configKeys)) { 
+			return 
+		}
+
+		configKeys.forEach(rule_name => {
+			const rule = ruleSet[rule_name]
+			if ( _.isNil(rule) ) { 
+				logging.error('empty rule for rule_name: ' + rule_name)
+				return 
+			}
+
+			foundRules.push(rule)
+		})
+	})
+
+	return foundRules
+}
+
+const getRulesTriggeredBy = function(allRuleSets, topic) {
 	
 	if ( _.isNil(allRuleSets) ) {
 		logging.error('empty rules')
@@ -342,23 +390,34 @@ const getRulesTriggeredBy = function(inRuleSets, topic) {
 
 global.changeProcessor = function(overrideRules, context, topic, message) {
 	const ruleStartTime = new Date().getTime()
-	logging.debug(' rule processing start ', {
-		action: 'rule-processing-start',
-		start_time: ruleStartTime
-	})
+	var allRuleSets = overrideRules
 
+	if ( _.isNil(allRuleSets) ) {
+		allRuleSets = rule_loader.get_configs()
+	}
+
+
+	const quiet = isAnyRuleQuiet(getRulesArray(allRuleSets))
+
+	if ( !quiet ) {
+		logging.debug(' rule processing start ', {
+			action: 'rule-processing-start',
+			start_time: ruleStartTime
+		})
+	}
 	if (_.isNil(context)) {
 		context = {}
 	}
-	
 
-	logging.debug('Begin Change Processor')
+	const foundRules = getRulesTriggeredBy(allRuleSets, topic)
 
-	const foundRules = getRulesTriggeredBy(overrideRules, topic)
-	logging.debug('      topic: ' + topic)
-	logging.debug('    message: ' + message)
-	logging.debug('      rules: ' + Object.keys(foundRules))
-	logging.debug('    context: ' + JSON.stringify(context))
+	if ( !quiet ) {
+		logging.debug('Begin Change Processor')
+		logging.debug('      topic: ' + topic)
+		logging.debug('    message: ' + message)
+		logging.debug('      rules: ' + Object.keys(foundRules))
+		logging.debug('    context: ' + JSON.stringify(context))
+	}
 
 	variables.update(topic, message)
 
@@ -366,8 +425,10 @@ global.changeProcessor = function(overrideRules, context, topic, message) {
 
 	const firstRun = context['firstRun']
 	var ruleProcessor = function(rule, rule_name, callback) {
-		logging.debug('processing rule: ' + rule_name)
-		logging.debug('    rule config: ' + JSON.stringify(rule))
+		if ( !quiet ) {
+			logging.debug('processing rule: ' + rule_name)
+			logging.debug('    rule config: ' + JSON.stringify(rule))
+		}
 
 		if (_.isNil(rule)) {
 			logging.error(' * empty rule passed, with name: ' + rule_name)
@@ -390,32 +451,38 @@ global.changeProcessor = function(overrideRules, context, topic, message) {
 			return
 		}
 
-		logging.debug('matched topic to rule', {
-			action: 'rule-match',
-			rule_name: rule_name,
-			topic: topic,
-			message: utilities.convertToNumberIfNeeded(message),
-			rule: rule
-			// context: context
-		})
-
+		if ( !quiet ) {
+			logging.debug('matched topic to rule', {
+				action: 'rule-match',
+				rule_name: rule_name,
+				topic: topic,
+				message: utilities.convertToNumberIfNeeded(message),
+				rule: rule
+				// context: context
+			})
+		}
 
 		evaluation.evalulateValue(topic, context, rule_name, rule, false)
 
-		logging.debug(' * done, dispatched rule: ' + rule_name)
+		if ( !quiet ) {
+			logging.debug(' * done, dispatched rule: ' + rule_name)
+		}
 
 		callback()
 	}
 
 	async.eachOf(foundRules, ruleProcessor)
 
-	logging.debug(' rule processing done ', {
-		action: 'rule-processing-done',
-		processing_time: ((new Date().getTime()) - ruleStartTime)
-	})
+	if ( !quiet ) {
+		logging.debug(' rule processing done ', {
+			action: 'rule-processing-done',
+			processing_time: ((new Date().getTime()) - ruleStartTime)
+		})
 
-	logging.debug(' => End Change Processor')
+		logging.debug(' => End Change Processor')
+	} 
 }
+
 
 global.generateContext = function(topic, inMessage, callback) {
 	if (_.isNil(callback)) {
