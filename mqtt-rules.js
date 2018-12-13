@@ -569,6 +569,13 @@ Array.prototype.unique = function() {
 	})
 }
   
+
+const getDevicesFromString = function(string) {
+	if ( _.isNil(string) )
+		{return null}
+
+	return string.match(/\/([a-z,0-9,\-,_,/])*/g)
+}
 const getAssociatedDevicesFromRule = function(rule) {
 	if ( _.isNil(rule) ) { 
 		return
@@ -593,7 +600,7 @@ const getAssociatedDevicesFromRule = function(rule) {
 		logging.debug('expression :' + expression)
 		if (!_.isNil(expression)) {
 
-			var foundDevices = expression.match(/\/([a-z,0-9,\-,_,/])*/g)
+			var foundDevices = getDevicesFromString(expression)
 
 			if (!_.isNil(foundDevices)) {
 				foundDevices.forEach(function(device) {
@@ -622,7 +629,7 @@ const getAssociatedDevicesFromRule = function(rule) {
 			}
 			const action_value = actions[action]
 
-			var foundDevices = action_value.match(/\/([a-z,0-9,\-,_,/])*/g)
+			var foundDevices = getDevicesFromString(action_value)
 
 			if (!_.isNil(foundDevices)) {
 				foundDevices.forEach(function(device) {
@@ -638,7 +645,7 @@ const getAssociatedDevicesFromRule = function(rule) {
 
 			Object.keys(all_actions).forEach(function(action_name) {
 				const action_value = all_actions[action_name]
-				var foundDevices = action_value.match(/\/([a-z,0-9,\-,_,/])*/g)
+				var foundDevices = getDevicesFromString(action_value)
 
 				if (!_.isNil(foundDevices)) {
 					foundDevices.forEach(function(device) {
@@ -647,6 +654,43 @@ const getAssociatedDevicesFromRule = function(rule) {
 				}
 			})
 		})
+	}
+	const processNotifyBlock = function(notify) {
+		if (!_.isNil(notify)) {
+			const titleDevices = getDevicesFromString(notify.title)
+			const messageDevices = getDevicesFromString(notify.message)
+			const expressionDevices = getDevicesFromString(notify.expression)
+	
+			if (!_.isNil(titleDevices)) {
+				titleDevices.forEach(function(device) {
+					associatedDevices.push(device)
+				})
+			}
+	
+			if (!_.isNil(messageDevices)) {
+				messageDevices.forEach(function(device) {
+					associatedDevices.push(device)
+				})
+			}
+	
+			if (!_.isNil(expressionDevices)) {
+				expressionDevices.forEach(function(device) {
+					associatedDevices.push(device)
+				})
+			}
+		}	
+	}
+
+	if ( !_.isNil(rule.notify)) {
+		processNotifyBlock(rule.notify)
+
+		if ( !_.isNil(rule.notify.if)) {
+			const allNotifyKeys = Object.keys(rule.notify.if)
+
+			allNotifyKeys.forEach(notifyKey => {
+				processNotifyBlock(rule.notify.if[notifyKey])
+			})
+		}
 	}
 
 	return associatedDevices.unique()
