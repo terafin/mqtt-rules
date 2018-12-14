@@ -571,8 +571,9 @@ Array.prototype.unique = function() {
   
 
 const getDevicesFromString = function(string) {
-	if ( _.isNil(string) )
-		{return null}
+	if ( _.isNil(string) ) { 
+		return null 
+	}
 
 	return string.match(/\/([a-z,0-9,\-,_,/])*/g)
 }
