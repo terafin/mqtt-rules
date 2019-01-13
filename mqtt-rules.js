@@ -213,11 +213,11 @@ global.publish = function(rule_name, expression, valueOrExpression, topic, messa
 	}
 
 	if (!quiet && !global.isTestMode()) {
-		logging.info('=> rule: ' + rule_name + '  publishing: ' + topic + ':' + message + ' (expression: ' + expression + ' | value: ' + valueOrExpression + ')' + '  options: ' + JSON.stringify(inOptions))
+		logging.info('=> rule: ' + rule_name + '  publishing: ' + topic + ':' + message + ' (expression: ' + expression + ' | value: ' + valueOrExpression + ')' + '  options: ' + JSON.stringify(options))
 	}
 
 	if (_.isNil(global.client)) {
-		logging.error('=> (client not initialized, not publishing) rule: ' + rule_name + '  publishing: ' + topic + ':' + message + ' (expression: ' + expression + ' | value: ' + valueOrExpression + ')' + '  options: ' + JSON.stringify(inOptions))
+		logging.error('=> (client not initialized, not publishing) rule: ' + rule_name + '  publishing: ' + topic + ':' + message + ' (expression: ' + expression + ' | value: ' + valueOrExpression + ')' + '  options: ' + JSON.stringify(options))
 	} else {
 
 
@@ -226,20 +226,19 @@ global.publish = function(rule_name, expression, valueOrExpression, topic, messa
 			outgoing_message: message,
 			outgoing_options: options
 		}
-		logging.debug(' queue publish : ' + topic + '  message: ' + message)
+		logging.debug(' queue publish : ' + topic + '  message: ' + message + '  data: ' + JSON.stringify(data))
 
 		queue.enqueue('mqtt-publish', topic, function(job, doneEvaluate) {
 			const queued_topic = job.data.outgoing_topic
 			const queued_message = job.data.outgoing_message
-			const queued_options = job.data.outoging_options
-			logging.debug(' queued FIRE publish : ' + queued_topic + '  message: ' + queued_message)
+			const queued_options = job.data.outgoing_options
+			logging.debug(' queued FIRE publish : ' + queued_topic + '  message: ' + queued_message  + '   job: ' + JSON.stringify(job)+ '   options: ' + JSON.stringify(queued_options))
 
 			global.client.publish(queued_topic, queued_message, queued_options)
 
 			if (!_.isNil(doneEvaluate)) {
 				doneEvaluate() 
 			}
-
 		}, data, 50, true, null)
 
 	}
