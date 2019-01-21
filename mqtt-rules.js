@@ -58,7 +58,7 @@ const handleMQTTConnection = function() {
 	if (is_test_mode === false) {
 		global.client.on('message', (topic, message) => {
 			if (isCollectingMQTTChanges()) {
-				logging.info(' * pending processing update for: ' + topic + '  => (handling in bulk)')
+				logging.debug(' * pending processing update for: ' + topic + '  => (handling in bulk)')
 				collectChange(topic, message)
 				return
 			}
@@ -234,6 +234,10 @@ global.publish = function(rule_name, expression, valueOrExpression, topic, messa
 			const queued_options = job.data.outgoing_options
 			logging.debug(' queued FIRE publish : ' + queued_topic + '  message: ' + queued_message  + '   job: ' + JSON.stringify(job)+ '   options: ' + JSON.stringify(queued_options))
 
+			if ( !quiet ) { 
+				logging.info(' MQTT publishing : ' + queued_topic + '  message: ' + queued_message) 
+			}
+
 			global.client.publish(queued_topic, queued_message, queued_options)
 
 			if (!_.isNil(doneEvaluate)) {
@@ -395,7 +399,7 @@ global.changeProcessor = function(overrideRules, context, topic, message) {
 		allRuleSets = rule_loader.get_configs()
 	}
 
-
+	
 	const quiet = isAnyRuleQuiet(getRulesArray(allRuleSets))
 
 	if ( !quiet ) {
@@ -461,7 +465,7 @@ global.changeProcessor = function(overrideRules, context, topic, message) {
 			})
 		}
 
-		evaluation.evalulateValue(topic, context, rule_name, rule, false)
+		evaluation.evalulateValue(topic, context, rule_name, rule, false, 'topic: ' + topic)
 
 		if ( !quiet ) {
 			logging.debug(' * done, dispatched rule: ' + rule_name)
@@ -707,6 +711,8 @@ rule_loader.on('rules-loaded', () => {
 	global.devices_to_monitor = []
 	clearRuleMapCache()
 
+	var ruleCount = 0
+	
 	rule_loader.ruleIterator(function(rule_name, rule) {
 		var triggerDevices = getDevicesToWatchForRule(rule)
 		
@@ -730,6 +736,8 @@ rule_loader.on('rules-loaded', () => {
 		if ( !_.isNil(associatedDevices) ) {
 			global.devices_to_monitor = _.concat(associatedDevices, global.devices_to_monitor)
 		}
+
+		ruleCount = ruleCount + 1
 	})
 
 	global.devices_to_monitor = utilities.unique(global.devices_to_monitor)
@@ -740,6 +748,8 @@ rule_loader.on('rules-loaded', () => {
 	})
 
 	logging.info(' => Rules loaded')
+	logging.info('     Devices to monitor: ' + global.devices_to_monitor.length)
+	logging.info('                  Rules: ' + ruleCount)
 
 	variables.updateObservedTopics(global.devices_to_monitor, function() {
 		setupMQTT()
