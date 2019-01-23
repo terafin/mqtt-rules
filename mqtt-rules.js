@@ -20,6 +20,8 @@ const variables = require('./lib/variables.js')
 const utilities = require('./lib/utilities.js')
 const schedule = require('./lib/scheduled-jobs.js')
 const evaluation = require('./lib/evaluation.js')
+const TIMEZONE = utilities.getCurrentTimeZone()
+const moment = require('moment-timezone')
 
 const config_path = process.env.TRANSFORM_CONFIG_PATH
 const connectionProcessorDelay = 10
@@ -193,6 +195,112 @@ const setupMQTT = function() {
 	}
 }
 
+var ruleHistory = []
+var quietRuleHistory = []
+
+const RULES_TO_REMEMBER = 100
+const QUIET_RULES_TO_REMEMBER = 1000
+
+const resetRuleHistory = function() {
+	ruleHistory = []
+	quietRuleHistory = []
+}
+
+const addRuleToHistory = function(rule_name, expression, valueOrExpression, topic, message, inOptions) {
+	if ( _.isNil(rule_name ) ) { 
+		return 
+	}
+
+	var quiet = false
+
+	if (!_.isNil(inOptions)) {
+		if (!_.isNil(inOptions.quiet)) {
+			quiet = inOptions.quiet
+		}
+	}
+
+
+	const data = {
+		date: moment(new Date()).tz(TIMEZONE).unix(),
+		rule_name: rule_name,
+		expression: expression,
+		valueOrExpression: valueOrExpression,
+		result: true,
+		topic: topic,
+		message: message,
+		options: inOptions
+	}
+
+	if ( quiet ) {
+		quietRuleHistory.unshift(data)
+		quietRuleHistory = quietRuleHistory.slice(0, QUIET_RULES_TO_REMEMBER)
+	} else {
+		ruleHistory.unshift(data)
+		ruleHistory = ruleHistory.slice(0, RULES_TO_REMEMBER)
+	}
+}
+
+const timeLastRuleRun = function(rule_name) {
+	var foundDate = null
+
+	const checkData = function(data) {
+		if ( foundDate ) { 
+			return 
+		}
+
+		const this_name = data.rule_name
+		if ( rule_name == this_name ) {
+			foundDate = data.date
+		}
+	}
+
+	ruleHistory.forEach(data => {
+		checkData(data)
+	})
+
+	quietRuleHistory.forEach(data => {
+		checkData(data)
+	})
+
+	if ( !_.isNil(foundDate)) {
+		return foundDate
+	}
+	
+	return 0
+}
+
+const printRuleHistory = function() {
+	logging.info('=== Rules Log ===')
+	logging.info('')
+
+	const printRule = function(data) {
+		const rule_name = data.rule_name
+		const date = data.date
+		const topic = data.topic
+		const message = data.message
+		const expression = data.expression ? data.expression : 'simple'
+		const valueOrExpression = data.valueOrExpression
+		const result = data.result
+		logging.info(' [' + moment.unix(date).format('DD.MM.YY - HH:mm:ss') + '] ' + rule_name + ' (' + result + '): ' + expression + ' | ' + valueOrExpression + ' | ' + topic + ':' + message)
+
+	}
+	ruleHistory.forEach(data => {
+		printRule(data)
+	})
+
+	logging.info('=== Quiet     ===')
+	logging.info('')
+	quietRuleHistory.forEach(data => {
+		printRule(data)
+	})
+
+
+	logging.info('=================')
+}
+
+global.timeLastRuleRun = timeLastRuleRun
+global.printRuleHistory = printRuleHistory
+
 global.publishEvents = []
 
 global.publish = function(rule_name, expression, valueOrExpression, topic, message, inOptions) {
@@ -219,8 +327,6 @@ global.publish = function(rule_name, expression, valueOrExpression, topic, messa
 	if (_.isNil(global.client)) {
 		logging.error('=> (client not initialized, not publishing) rule: ' + rule_name + '  publishing: ' + topic + ':' + message + ' (expression: ' + expression + ' | value: ' + valueOrExpression + ')' + '  options: ' + JSON.stringify(options))
 	} else {
-
-
 		const data = {
 			outgoing_topic: topic,
 			outgoing_message: message,
@@ -235,16 +341,17 @@ global.publish = function(rule_name, expression, valueOrExpression, topic, messa
 			logging.debug(' queued FIRE publish : ' + queued_topic + '  message: ' + queued_message  + '   job: ' + JSON.stringify(job)+ '   options: ' + JSON.stringify(queued_options))
 
 			if ( !quiet ) { 
-				logging.info(' MQTT publishing : ' + queued_topic + '  message: ' + queued_message) 
+				logging.info(' => MQTT publish: ' + queued_topic + '  message: ' + queued_message) 
 			}
 
 			global.client.publish(queued_topic, queued_message, queued_options)
+
+			addRuleToHistory(rule_name, expression, valueOrExpression, queued_topic, queued_message, queued_options)
 
 			if (!_.isNil(doneEvaluate)) {
 				doneEvaluate() 
 			}
 		}, data, 50, true, null)
-
 	}
 }
 
@@ -750,12 +857,14 @@ rule_loader.on('rules-loaded', () => {
 	logging.info(' => Rules loaded')
 	logging.info('     Devices to monitor: ' + global.devices_to_monitor.length)
 	logging.info('                  Rules: ' + ruleCount)
-
+	
 	variables.updateObservedTopics(global.devices_to_monitor, function() {
 		setupMQTT()
 		schedule.scheduleJobs()
 		api.updateRules(rule_loader)
 	})
+
+	resetRuleHistory()
 })
 
 global.clearQueues = function() {
