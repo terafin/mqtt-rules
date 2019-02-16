@@ -298,6 +298,9 @@ const printRuleHistory = function() {
 	logging.info('=================')
 }
 
+global.getRuleHistory = function() {
+	return ruleHistory
+}
 global.timeLastRuleRun = timeLastRuleRun
 global.printRuleHistory = printRuleHistory
 
