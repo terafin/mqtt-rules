@@ -198,8 +198,8 @@ const setupMQTT = function() {
 var ruleHistory = []
 var quietRuleHistory = []
 
-const RULES_TO_REMEMBER = 100
-const QUIET_RULES_TO_REMEMBER = 1000
+const RULES_TO_REMEMBER = 1000
+const QUIET_RULES_TO_REMEMBER = 4000
 
 const resetRuleHistory = function() {
 	ruleHistory = []
