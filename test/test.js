@@ -32,6 +32,7 @@ var setupTest = function(actions, callback, minimumTime) {
 
 	targetTestActions = actions
 	targetCallback = callback
+
 	if ((minimumTime != null) && minimumTime > 0) {
 		targetEarliestDate = new Date(new Date().getTime() + (minimumTime * 1000))
 		targetStartDate = new Date().getTime()
@@ -44,7 +45,7 @@ global.publish = function(rule_name, expression, valueOrExpression, topic, messa
 		return
 	}
 
-	// console.log('incoming: ' + topic + ':' + message)
+	//console.log('incoming: ' + topic + ':' + message)
 
 	if ( _.isNil(targetTestActions)) {
 		logging.error('fail, I was not expecting anything and I got: ' + topic + ' message: ' + message)
@@ -153,7 +154,7 @@ const testProcessor = function(rule, rule_name, test, test_name) {
 			setupTest(target, done)
 
 			global.generateContext(inputTopic, inputValue, function(outTopic, outMessage, generatedContext) {
-				global.changeProcessor(null, generatedContext, outTopic, outMessage)
+				global.changeProcessor([formattedRule], generatedContext, outTopic, outMessage)
 			})
 		})
 	})
