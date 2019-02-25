@@ -206,7 +206,7 @@ const resetRuleHistory = function() {
 	quietRuleHistory = []
 }
 
-const addRuleToHistory = function(rule_name, expression, valueOrExpression, topic, message, inOptions) {
+const addRuleToHistory = function(rule_name, expression, valueOrExpression, topic, message, inOptions, evaluate_job_data) {
 	if ( _.isNil(rule_name ) ) { 
 		return 
 	}
@@ -223,6 +223,7 @@ const addRuleToHistory = function(rule_name, expression, valueOrExpression, topi
 	const data = {
 		date: moment(new Date()).tz(TIMEZONE).unix(),
 		rule_name: rule_name,
+		evaluate_job_data: evaluate_job_data,
 		expression: expression,
 		valueOrExpression: valueOrExpression,
 		result: true,
@@ -306,7 +307,7 @@ global.printRuleHistory = printRuleHistory
 
 global.publishEvents = []
 
-global.publish = function(rule_name, expression, valueOrExpression, topic, message, inOptions) {
+global.publish = function(rule_name, expression, valueOrExpression, topic, message, inOptions, evaluate_job_data) {
 	var options = {
 		retain: false,
 		qos: 2
@@ -349,7 +350,7 @@ global.publish = function(rule_name, expression, valueOrExpression, topic, messa
 
 			global.client.publish(queued_topic, queued_message, queued_options)
 
-			addRuleToHistory(rule_name, expression, valueOrExpression, queued_topic, queued_message, queued_options)
+			addRuleToHistory(rule_name, expression, valueOrExpression, queued_topic, queued_message, queued_options, evaluate_job_data)
 
 			if (!_.isNil(doneEvaluate)) {
 				doneEvaluate() 

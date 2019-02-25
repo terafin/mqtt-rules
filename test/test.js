@@ -40,7 +40,7 @@ var setupTest = function(actions, callback, minimumTime) {
 	}
 }
 
-global.publish = function(rule_name, expression, valueOrExpression, topic, message, options) {
+global.publish = function(rule_name, expression, valueOrExpression, topic, message, options, evaluate_job_data) {
 	if (topic.startsWith('happy')) {
 		return
 	}
