@@ -310,7 +310,7 @@ global.publishEvents = []
 global.publish = function(rule_name, expression, valueOrExpression, topic, message, inOptions, evaluate_job_data) {
 	var options = {
 		retain: false,
-		qos: 2
+		qos: 1
 	}
 	var quiet = false
 
