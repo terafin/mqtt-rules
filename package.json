@@ -13,16 +13,12 @@
     },
     "dependencies": {
         "async": "latest",
-        "bull": "latest",
-        "chai": "latest",
         "express": "latest",
         "feels": "latest",
-        "graphite": "latest",
         "homeautomation-js-lib": "git://github.com/terafin/homeautomation-js-lib.git",
         "jexl": "latest",
         "js-yaml": "latest",
         "lodash": "latest",
-        "mocha": "latest",
         "moment-timezone": "latest",
         "mqtt": "latest",
         "mqtt-wildcard": "latest",
@@ -32,6 +28,10 @@
         "redis": "latest",
         "request": "latest",
         "suncalc": "latest"
+    },
+    "devDependencies": {
+        "chai": "latest",
+        "mocha": "latest"
     },
     "engines": {
         "node": ">=4"
