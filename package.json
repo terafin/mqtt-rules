@@ -26,6 +26,7 @@
         "pushover-notifications": "latest",
         "read-directory": "latest",
         "redis": "latest",
+        "watch": "latest",
         "request": "latest",
         "suncalc": "latest"
     },
