@@ -375,8 +375,31 @@ const cachedRulesForTopic = function(topic) {
 	if ( _.isNil(topic)) {
 		return null
 	}
-
 	return ruleMapCache[topic]
+
+	const simpleResult = ruleMapCache[topic]
+	if ( !_.isNil(simpleResult) ) {
+		logging.debug('returning simple match for: ' + topic)
+		return simpleResult
+	}
+
+	var foundMatch = null
+	Object.keys(ruleMapCache).forEach(key => {
+		if ( !_.isNil(foundMatch) ) { 
+			return 
+		}
+
+		if ( key.includes('+') ) {
+			const match = mqtt_wildcard(topic, key)
+			if ( !_.isNil(match) ) {
+				logging.debug('found wildcard match for: ' + topic + ' + wildcard: ' + key)
+				cacheRulesForTopic(topic, cachedRulesForTopic[key])
+				foundMatch = key
+			}
+		}
+	})
+
+	return cachedRulesForTopic(foundMatch)
 }
 
 const isRuleQuiet = function(rule) {
@@ -839,8 +862,8 @@ rule_loader.on('rules-loaded', () => {
 			})
 		}
 
-		if ( !_.isNil(associatedDevices) ) {
-			global.devices_to_monitor = _.concat(associatedDevices, global.devices_to_monitor)
+		if ( !_.isNil(triggerDevices) ) {
+			global.devices_to_monitor = _.concat(triggerDevices, global.devices_to_monitor)
 		}
 
 		var associatedDevices = getAssociatedDevicesFromRule(rule)
