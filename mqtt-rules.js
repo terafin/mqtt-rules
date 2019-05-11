@@ -1,5 +1,5 @@
 // Requirements
-const mqtt = require('mqtt')
+const mqtt_client = require('mqtt')
 const async = require('async')
 const _ = require('lodash')
 const mqtt_wildcard = require('mqtt-wildcard')
@@ -187,7 +187,7 @@ const setupMQTT = function() {
 	}
 
 	if (is_test_mode === false) {
-		global.client = mqtt.setupClient(function() {
+		global.client = mqtt_client.setupClient(function() {
 			handleMQTTConnection()
 		}, function() {
 			disconnectionEvent()
