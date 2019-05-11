@@ -3,12 +3,12 @@ const mqtt = require('mqtt')
 const async = require('async')
 const _ = require('lodash')
 const mqtt_wildcard = require('mqtt-wildcard')
+const mqtt_helpers = require('homeautomation-js-lib/mqtt_helpers.js')
 
 const logging = require('homeautomation-js-lib/logging.js')
 const health = require('homeautomation-js-lib/health.js')
 
 require('homeautomation-js-lib/devices.js')
-require('homeautomation-js-lib/mqtt_helpers.js')
 require('homeautomation-js-lib/redis_helpers.js')
 
 var collectedMQTTTChanges = null
@@ -187,7 +187,7 @@ const setupMQTT = function() {
 	}
 
 	if (is_test_mode === false) {
-		global.client = mqtt.setupClient(function() {
+		global.client = mqtt_helpers.setupClient(function() {
 			handleMQTTConnection()
 		}, function() {
 			disconnectionEvent()
