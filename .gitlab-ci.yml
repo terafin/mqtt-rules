@@ -9,7 +9,7 @@ build-master:
   stage: build
   script:
     - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" $CI_REGISTRY
-    - docker build --no-cache --pull -t "$CI_REGISTRY_IMAGE" .
+    - docker build --pull -t "$CI_REGISTRY_IMAGE" .
     - docker push "$CI_REGISTRY_IMAGE"
   only:
     - master
@@ -18,7 +18,7 @@ build-master-docker:
   stage: build
   script:
     - docker login -u "$DOCKER_REGISTRY_USER" -p "$DOCKER_REGISTRY_PASSWORD"
-    - docker build --no-cache --pull -t "$DOCKER_REGISTRY_IMAGE" .
+    - docker build --pull -t "$DOCKER_REGISTRY_IMAGE" .
     - docker push "$DOCKER_REGISTRY_IMAGE"
   only:
     - master
@@ -27,7 +27,7 @@ build:
   stage: build
   script:
     - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" $CI_REGISTRY
-    - docker build --no-cache --pull -t "$CI_REGISTRY_IMAGE:$CI_COMMIT_REF_SLUG" .
+    - docker build --pull -t "$CI_REGISTRY_IMAGE:$CI_COMMIT_REF_SLUG" .
     - docker push "$CI_REGISTRY_IMAGE:$CI_COMMIT_REF_SLUG"
   except:
     - master
@@ -35,5 +35,5 @@ build:
 deploy:
   stage: deploy
   script:
-    - apk add --update --no-cache curl && rm -rf /var/cache/apk/*
-    - curl -X POST $DEPLOY_URL/$DEPLOY_UUID
+    - apk add --update curl
+    - curl -H "X-Docker-Token:$DOCKER_AUTH_TOKEN"  -X GET "https://siliconspirit.net/hooks/docker-iot-update?DOCKER_SERVICE_NAME=automation_$CI_PROJECT_NAME&DOCKER_IMAGE_PREFIX=$DOCKER_REGISTRY_USER&DOCKER_IMAGE_NAME=$CI_PROJECT_NAME&DOCKER_IMAGE_TAG=$DOCKER_IMAGE_TAG"
