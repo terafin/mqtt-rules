@@ -23,7 +23,7 @@ const evaluation = require('./lib/evaluation.js')
 const TIMEZONE = utilities.getCurrentTimeZone()
 const moment = require('moment-timezone')
 
-const config_path = process.env.TRANSFORM_CONFIG_PATH
+const config_path = process.env.RULE_PATH
 const connectionProcessorDelay = 10
 
 var is_test_mode = process.env.TEST_MODE
@@ -67,7 +67,7 @@ const handleMQTTConnection = function() {
 
 			var foundMatch = global.devices_to_monitor.includes(topic)
 
-			if ( _.isNil(foundMatch)) {
+			if (_.isNil(foundMatch)) {
 				global.devices_to_monitor.forEach(deviceToMontor => {
 					if (!_.isNil(foundMatch)) {
 						return
@@ -98,13 +98,13 @@ const handleMQTTConnection = function() {
 				global.generateContext(queued_topic, queued_message, function(outTopic, outMessage, context) {
 					global.changeProcessor(null, context, queued_topic, queued_message)
 				})
-	
+
 				if (!_.isNil(doneEvaluate)) {
-					doneEvaluate() 
+					doneEvaluate()
 				}
 
 			}, data, 50, true, null)
-	
+
 		})
 	}
 
@@ -117,7 +117,7 @@ const handleMQTTConnection = function() {
 }
 
 const disconnectionEvent = function() {
-	if (!_.isNil(global.client) && global.client.connected ) {
+	if (!_.isNil(global.client) && global.client.connected) {
 		return
 	}
 
@@ -207,8 +207,8 @@ const resetRuleHistory = function() {
 }
 
 const addRuleToHistory = function(rule_name, expression, valueOrExpression, topic, message, inOptions, evaluate_job_data) {
-	if ( _.isNil(rule_name ) ) { 
-		return 
+	if (_.isNil(rule_name)) {
+		return
 	}
 
 	var quiet = false
@@ -232,7 +232,7 @@ const addRuleToHistory = function(rule_name, expression, valueOrExpression, topi
 		options: inOptions
 	}
 
-	if ( quiet ) {
+	if (quiet) {
 		quietRuleHistory.unshift(data)
 		quietRuleHistory = quietRuleHistory.slice(0, QUIET_RULES_TO_REMEMBER)
 	} else {
@@ -245,12 +245,12 @@ const timeLastRuleRun = function(rule_name) {
 	var foundDate = null
 
 	const checkData = function(data) {
-		if ( foundDate ) { 
-			return 
+		if (foundDate) {
+			return
 		}
 
 		const this_name = data.rule_name
-		if ( rule_name == this_name ) {
+		if (rule_name == this_name) {
 			foundDate = data.date
 		}
 	}
@@ -263,10 +263,10 @@ const timeLastRuleRun = function(rule_name) {
 		checkData(data)
 	})
 
-	if ( !_.isNil(foundDate)) {
+	if (!_.isNil(foundDate)) {
 		return foundDate
 	}
-	
+
 	return 0
 }
 
@@ -342,10 +342,10 @@ global.publish = function(rule_name, expression, valueOrExpression, topic, messa
 			const queued_topic = job.data.outgoing_topic
 			const queued_message = job.data.outgoing_message
 			const queued_options = job.data.outgoing_options
-			logging.debug(' queued FIRE publish : ' + queued_topic + '  message: ' + queued_message  + '   job: ' + JSON.stringify(job)+ '   options: ' + JSON.stringify(queued_options))
+			logging.debug(' queued FIRE publish : ' + queued_topic + '  message: ' + queued_message + '   job: ' + JSON.stringify(job) + '   options: ' + JSON.stringify(queued_options))
 
-			if ( !quiet ) { 
-				logging.info(' => MQTT publish: ' + queued_topic + '  message: ' + queued_message) 
+			if (!quiet) {
+				logging.info(' => MQTT publish: ' + queued_topic + '  message: ' + queued_message)
 			}
 
 			global.client.publish(queued_topic, queued_message, queued_options)
@@ -353,7 +353,7 @@ global.publish = function(rule_name, expression, valueOrExpression, topic, messa
 			addRuleToHistory(rule_name, expression, valueOrExpression, queued_topic, queued_message, queued_options, evaluate_job_data)
 
 			if (!_.isNil(doneEvaluate)) {
-				doneEvaluate() 
+				doneEvaluate()
 			}
 		}, data, 50, true, null)
 	}
@@ -372,26 +372,26 @@ const clearRuleMapCache = function() {
 }
 
 const cachedRulesForTopic = function(topic) {
-	if ( _.isNil(topic)) {
+	if (_.isNil(topic)) {
 		return null
 	}
 	return ruleMapCache[topic]
 
 	const simpleResult = ruleMapCache[topic]
-	if ( !_.isNil(simpleResult) ) {
+	if (!_.isNil(simpleResult)) {
 		logging.debug('returning simple match for: ' + topic)
 		return simpleResult
 	}
 
 	var foundMatch = null
 	Object.keys(ruleMapCache).forEach(key => {
-		if ( !_.isNil(foundMatch) ) { 
-			return 
+		if (!_.isNil(foundMatch)) {
+			return
 		}
 
-		if ( key.includes('+') ) {
+		if (key.includes('+')) {
 			const match = mqtt_wildcard(topic, key)
-			if ( !_.isNil(match) ) {
+			if (!_.isNil(match)) {
 				logging.debug('found wildcard match for: ' + topic + ' + wildcard: ' + key)
 				cacheRulesForTopic(topic, cachedRulesForTopic[key])
 				foundMatch = key
@@ -405,7 +405,7 @@ const cachedRulesForTopic = function(topic) {
 const isRuleQuiet = function(rule) {
 	var quiet = false
 
-	if ( !_.isNil(rule) && !_.isNil(rule.options) ) {
+	if (!_.isNil(rule) && !_.isNil(rule.options)) {
 		quiet = rule.options.quiet
 	}
 
@@ -423,7 +423,7 @@ const isAnyRuleQuiet = function(rules) {
 }
 
 const cacheRulesForTopic = function(topic, rules) {
-	if ( _.isNil(topic)) {
+	if (_.isNil(topic)) {
 		return null
 	}
 
@@ -431,29 +431,29 @@ const cacheRulesForTopic = function(topic, rules) {
 }
 
 const getRulesArray = function(allRuleSets) {
-	if ( _.isNil(allRuleSets) ) {
+	if (_.isNil(allRuleSets)) {
 		logging.error('empty rules')
 		return null
 	}
-	
+
 	var foundRules = []
 	allRuleSets.forEach(ruleSet => {
-		if ( _.isNil(ruleSet)) { 
+		if (_.isNil(ruleSet)) {
 			logging.error('null rule set?')
-			return 
+			return
 		}
 
 		const configKeys = Object.keys(ruleSet)
 
-		if ( _.isNil(configKeys)) { 
-			return 
+		if (_.isNil(configKeys)) {
+			return
 		}
 
 		configKeys.forEach(rule_name => {
 			const rule = ruleSet[rule_name]
-			if ( _.isNil(rule) ) { 
+			if (_.isNil(rule)) {
 				logging.error('empty rule for rule_name: ' + rule_name)
-				return 
+				return
 			}
 
 			foundRules.push(rule)
@@ -464,51 +464,51 @@ const getRulesArray = function(allRuleSets) {
 }
 
 const getRulesTriggeredBy = function(allRuleSets, topic) {
-	
-	if ( _.isNil(allRuleSets) ) {
+
+	if (_.isNil(allRuleSets)) {
 		logging.error('empty rules')
 		return null
 	}
-	
+
 	const existingRecord = cachedRulesForTopic(topic)
 
-	if ( !_.isNil(existingRecord)) {
+	if (!_.isNil(existingRecord)) {
 		return existingRecord
 	}
 
 	var foundRules = {}
 	allRuleSets.forEach(ruleSet => {
-		if ( _.isNil(ruleSet)) { 
+		if (_.isNil(ruleSet)) {
 			logging.error('null rule set?')
-			return 
+			return
 		}
 
 		const configKeys = Object.keys(ruleSet)
 
 		logging.debug('rule set: ' + configKeys)
 
-		if ( _.isNil(configKeys)) { 
-			return 
+		if (_.isNil(configKeys)) {
+			return
 		}
 
 		configKeys.forEach(rule_name => {
 			const rule = ruleSet[rule_name]
-			if ( _.isNil(rule) ) { 
+			if (_.isNil(rule)) {
 				logging.error('empty rule for rule_name: ' + rule_name)
-				return 
+				return
 			}
 
 			const devicesToWatch = getDevicesToWatchForRule(rule)
 			logging.debug('rule: ' + rule_name + '   to watch: ' + devicesToWatch)
-		
+
 			if (!_.isNil(devicesToWatch)) {
 				var foundMatch = null
-		
+
 				devicesToWatch.forEach(deviceToWatch => {
 					if (!_.isNil(foundMatch)) {
 						return
 					}
-		
+
 					const match = mqtt_wildcard(topic, deviceToWatch)
 					if (!_.isNil(match)) {
 						foundRules[rule_name] = rule
@@ -529,14 +529,14 @@ global.changeProcessor = function(overrideRules, context, topic, message) {
 	const ruleStartTime = new Date().getTime()
 	var allRuleSets = overrideRules
 
-	if ( _.isNil(allRuleSets) ) {
+	if (_.isNil(allRuleSets)) {
 		allRuleSets = rule_loader.get_configs()
 	}
 
-	
+
 	const quiet = isAnyRuleQuiet(getRulesArray(allRuleSets))
 
-	if ( !quiet ) {
+	if (!quiet) {
 		logging.debug(' rule processing start ', {
 			action: 'rule-processing-start',
 			start_time: ruleStartTime
@@ -548,7 +548,7 @@ global.changeProcessor = function(overrideRules, context, topic, message) {
 
 	const foundRules = getRulesTriggeredBy(allRuleSets, topic)
 
-	if ( !quiet ) {
+	if (!quiet) {
 		logging.debug('Begin Change Processor')
 		logging.debug('      topic: ' + topic)
 		logging.debug('    message: ' + message)
@@ -562,7 +562,7 @@ global.changeProcessor = function(overrideRules, context, topic, message) {
 
 	const firstRun = context['firstRun']
 	var ruleProcessor = function(rule, rule_name, callback) {
-		if ( !quiet ) {
+		if (!quiet) {
 			logging.debug('processing rule: ' + rule_name)
 			logging.debug('    rule config: ' + JSON.stringify(rule))
 		}
@@ -588,7 +588,7 @@ global.changeProcessor = function(overrideRules, context, topic, message) {
 			return
 		}
 
-		if ( !quiet ) {
+		if (!quiet) {
 			logging.debug('matched topic to rule', {
 				action: 'rule-match',
 				rule_name: rule_name,
@@ -601,7 +601,7 @@ global.changeProcessor = function(overrideRules, context, topic, message) {
 
 		evaluation.evalulateValue(topic, context, rule_name, rule, false, 'topic: ' + topic)
 
-		if ( !quiet ) {
+		if (!quiet) {
 			logging.debug(' * done, dispatched rule: ' + rule_name)
 		}
 
@@ -610,14 +610,14 @@ global.changeProcessor = function(overrideRules, context, topic, message) {
 
 	async.eachOf(foundRules, ruleProcessor)
 
-	if ( !quiet ) {
+	if (!quiet) {
 		logging.debug(' rule processing done ', {
 			action: 'rule-processing-done',
 			processing_time: ((new Date().getTime()) - ruleStartTime)
 		})
 
 		logging.debug(' => End Change Processor')
-	} 
+	}
 }
 
 
@@ -636,7 +636,7 @@ global.generateContext = function(topic, inMessage, callback) {
 
 	const valueMap = variables.valuesForTopics(devices_to_monitor)
 
-	if ( !_.isNil(valueMap) ) {
+	if (!_.isNil(valueMap)) {
 		var context = {}
 
 		Object.keys(valueMap).forEach(resultTopic => {
@@ -665,16 +665,16 @@ global.generateContext = function(topic, inMessage, callback) {
 			}
 		} catch (err) {
 			// eslint-disable-next-line
-		}
+        }
 	}
 
-	if ( !_.isNil(callback) ) {
+	if (!_.isNil(callback)) {
 		return callback(topic, message, context)
 	}
 }
 
 const getDevicesToWatchForRule = function(rule) {
-	if ( _.isNil(rule) ) { 
+	if (_.isNil(rule)) {
 		return
 	}
 
@@ -701,21 +701,21 @@ global.getAssociatedDevicesFromRule = function(rule) {
 }
 
 Array.prototype.unique = function() {
-	return this.filter(function(value, index, self) { 
+	return this.filter(function(value, index, self) {
 		return self.indexOf(value) === index
 	})
 }
-  
+
 
 const getDevicesFromString = function(string) {
-	if ( _.isNil(string) ) { 
-		return null 
+	if (_.isNil(string)) {
+		return null
 	}
 
 	return string.match(/\/([a-z,0-9,\-,_,/])*/g)
 }
 const getAssociatedDevicesFromRule = function(rule) {
-	if ( _.isNil(rule) ) { 
+	if (_.isNil(rule)) {
 		return
 	}
 
@@ -751,7 +751,7 @@ const getAssociatedDevicesFromRule = function(rule) {
 	const actions = rule.actions
 	if (!_.isNil(actions)) {
 		Object.keys(actions).forEach(function(action) {
-			if ( action == 'if' ) {
+			if (action == 'if') {
 				const subExpressions = actions.if
 				const subExpressionKeys = Object.keys(subExpressions)
 
@@ -761,9 +761,9 @@ const getAssociatedDevicesFromRule = function(rule) {
 					subExpressionDevices.forEach(function(device) {
 						associatedDevices.push(device)
 					})
-	
+
 				})
-				return 
+				return
 			}
 			const action_value = actions[action]
 
@@ -798,31 +798,31 @@ const getAssociatedDevicesFromRule = function(rule) {
 			const titleDevices = getDevicesFromString(notify.title)
 			const messageDevices = getDevicesFromString(notify.message)
 			const expressionDevices = getDevicesFromString(notify.expression)
-	
+
 			if (!_.isNil(titleDevices)) {
 				titleDevices.forEach(function(device) {
 					associatedDevices.push(device)
 				})
 			}
-	
+
 			if (!_.isNil(messageDevices)) {
 				messageDevices.forEach(function(device) {
 					associatedDevices.push(device)
 				})
 			}
-	
+
 			if (!_.isNil(expressionDevices)) {
 				expressionDevices.forEach(function(device) {
 					associatedDevices.push(device)
 				})
 			}
-		}	
+		}
 	}
 
-	if ( !_.isNil(rule.notify)) {
+	if (!_.isNil(rule.notify)) {
 		processNotifyBlock(rule.notify)
 
-		if ( !_.isNil(rule.notify.if)) {
+		if (!_.isNil(rule.notify.if)) {
 			const allNotifyKeys = Object.keys(rule.notify.if)
 
 			allNotifyKeys.forEach(notifyKey => {
@@ -846,28 +846,28 @@ rule_loader.on('rules-loaded', () => {
 	clearRuleMapCache()
 
 	var ruleCount = 0
-	
+
 	rule_loader.ruleIterator(function(rule_name, rule) {
 		var triggerDevices = getDevicesToWatchForRule(rule)
-		
-		if ( !_.isNil(triggerDevices)) {
+
+		if (!_.isNil(triggerDevices)) {
 			triggerDevices.forEach(topic => {
 				var cachedRules = cachedRulesForTopic(topic)
-				if ( _.isNil(cachedRules)) {
+				if (_.isNil(cachedRules)) {
 					cachedRules = {}
 				}
-				
+
 				cachedRules[rule_name] = rule
 				cacheRulesForTopic(topic, cachedRules)
 			})
 		}
 
-		if ( !_.isNil(triggerDevices) ) {
+		if (!_.isNil(triggerDevices)) {
 			global.devices_to_monitor = _.concat(triggerDevices, global.devices_to_monitor)
 		}
 
 		var associatedDevices = getAssociatedDevicesFromRule(rule)
-		if ( !_.isNil(associatedDevices) ) {
+		if (!_.isNil(associatedDevices)) {
 			global.devices_to_monitor = _.concat(associatedDevices, global.devices_to_monitor)
 		}
 
@@ -884,7 +884,7 @@ rule_loader.on('rules-loaded', () => {
 	logging.info(' => Rules loaded')
 	logging.info('     Devices to monitor: ' + global.devices_to_monitor.length)
 	logging.info('                  Rules: ' + ruleCount)
-	
+
 	variables.updateObservedTopics(global.devices_to_monitor, function() {
 		setupMQTT()
 		schedule.scheduleJobs()

@@ -19,3 +19,4 @@ node_modules
 
 # ignore all *.class files in all folders, including build root
 **/*.class
+rules
