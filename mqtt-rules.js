@@ -891,6 +891,7 @@ rule_loader.on('rules-loaded', () => {
 		api.updateRules(rule_loader)
 	})
 
+	handleSubscriptions()
 	resetRuleHistory()
 })
 
