@@ -348,7 +348,7 @@ global.publish = function(rule_name, expression, valueOrExpression, topic, messa
 				logging.info(' => MQTT publish: ' + queued_topic + '  message: ' + queued_message)
 			}
 
-			// global.client.publish(queued_topic, queued_message, queued_options)
+			global.client.publish(queued_topic, queued_message, queued_options)
 
 			addRuleToHistory(rule_name, expression, valueOrExpression, queued_topic, queued_message, queued_options, evaluate_job_data)
 
