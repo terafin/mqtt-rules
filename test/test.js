@@ -3,8 +3,12 @@ const rules = require('../lib/loading.js')
 
 const TIMEZONE = utilities.getCurrentTimeZone()
 const _ = require('lodash')
+const mocha = require('mocha')
 const logging = require('homeautomation-js-lib/logging.js')
 const read_directory = require('read-directory')
+const describe = mocha.describe
+const before = mocha.before
+const it = mocha.it
 
 console.log('Running in timezone: ' + TIMEZONE)
 

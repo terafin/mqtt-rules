@@ -716,10 +716,18 @@ const getDevicesFromString = function(string) {
 }
 const getAssociatedDevicesFromRule = function(rule) {
 	if (_.isNil(rule)) {
-		return
+		return []
 	}
 
 	var associatedDevices = []
+
+	if (is_test_mode == false) {
+		const testRuleOnly = rule.test_only
+
+		if (!_.isNil(testRuleOnly) && testRuleOnly == true) { 
+			return []
+		}
+	}
 
 	const watch = rule.watch
 	if (!_.isNil(watch)) {
