@@ -279,7 +279,7 @@ const printRuleHistory = function() {
 		const date = data.date
 		const topic = data.topic
 		const message = data.message
-		const expression = data.expression ? data.expression : 'simple'
+		const expression = data.when ? data.when : 'simple'
 		const valueOrExpression = data.valueOrExpression
 		const result = data.result
 		logging.info(' [' + moment.unix(date).format('DD.MM.YY - HH:mm:ss') + '] ' + rule_name + ' (' + result + '): ' + expression + ' | ' + valueOrExpression + ' | ' + topic + ':' + message)
@@ -738,10 +738,9 @@ const getAssociatedDevicesFromRule = function(rule) {
 		}
 	}
 
-	const rules = rule.rules
+	const expression = rule.when
 
-	if (!_.isNil(rules)) {
-		const expression = rules.expression
+	if (!_.isNil(expression)) {
 		logging.debug('expression :' + expression)
 		if (!_.isNil(expression)) {
 
@@ -804,7 +803,7 @@ const getAssociatedDevicesFromRule = function(rule) {
 		if (!_.isNil(notify)) {
 			const titleDevices = getDevicesFromString(notify.title)
 			const messageDevices = getDevicesFromString(notify.message)
-			const expressionDevices = getDevicesFromString(notify.expression)
+			const expressionDevices = getDevicesFromString(notify.when)
 
 			if (!_.isNil(titleDevices)) {
 				titleDevices.forEach(function(device) {
