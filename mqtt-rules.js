@@ -598,7 +598,7 @@ global.changeProcessor = function(overrideRules, context, topic, message) {
 			})
 		}
 
-		evaluation.evalulateValue(topic, context, rule_name, rule, false, 'topic: ' + topic)
+		evaluation.evalulateValue(topic, context, rule_name, rule, false, false, 'topic: ' + topic)
 
 		if (!quiet) {
 			logging.debug(' * done, dispatched rule: ' + rule_name)
@@ -782,6 +782,37 @@ const getAssociatedDevicesFromRule = function(rule) {
 			}
 		})
 	}
+
+	// Need to handle action key here....
+	const otherwise = rule.otherwise
+	if (!_.isNil(otherwise)) {
+		Object.keys(otherwise).forEach(function(action) {
+			if (action == 'if') {
+				const subExpressions = otherwise.if
+				const subExpressionKeys = Object.keys(subExpressions)
+
+				subExpressionKeys.forEach(key => {
+					const subExpression = subExpressions[key]
+					const subExpressionDevices = getAssociatedDevicesFromRule(subExpression)
+					subExpressionDevices.forEach(function(device) {
+						associatedDevices.push(device)
+					})
+
+				})
+				return
+			}
+			const action_value = otherwise[action]
+
+			var foundDevices = getDevicesFromString(action_value)
+
+			if (!_.isNil(foundDevices)) {
+				foundDevices.forEach(function(device) {
+					associatedDevices.push(device)
+				})
+			}
+		})
+	}
+
 	const conditional_actions = !_.isNil(rule.actions) ? rule.actions.if : null
 	if (!_.isNil(conditional_actions)) {
 		Object.keys(conditional_actions).forEach(function(conditional_action_name) {
