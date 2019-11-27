@@ -1,5 +1,6 @@
 const utilities = require('../lib/utilities.js')
 const rules = require('../lib/loading.js')
+const moment = require('moment-timezone')
 
 const TIMEZONE = utilities.getCurrentTimeZone()
 const _ = require('lodash')
@@ -199,7 +200,75 @@ const processRuleFile = function(doc) {
 	})
 }
 
-describe('quick trigger tests', function() {
+describe('Date parsing', function() {
+	before(function() {
+		// runs before all tests in this block
+		global.clearQueues()
+	})
+
+	it('Parse 9:30', function(done) {
+		var result = moment(new Date()).tz(TIMEZONE)
+	
+		result.hours(Number(9))
+		result.minutes(Number(32))
+		result.seconds(Number(0))
+		result.milliseconds(Number(0))
+			
+		var time = utilities.parseTime('09:32')
+		if ( time.toDate().getTime() == result.toDate().getTime() ) { 
+			done()
+		} else {
+			logging.error('target time: ' + result + '   parsed time: ' + time)
+			done('failed to parse')
+		}
+	})
+
+	it('Parse 12:33', function(done) {
+		var result = moment(new Date()).tz(TIMEZONE)
+	
+		result.hours(Number(12))
+		result.minutes(Number(33))
+		result.seconds(Number(0))
+		result.milliseconds(Number(0))
+			
+		var time = utilities.parseTime('12:33')
+		if ( time.toDate().getTime() == result.toDate().getTime() ) { 
+			done()
+		} else {
+			logging.error('target time: ' + result + '   parsed time: ' + time)
+			done('failed to parse')
+		}
+	})
+	it('Parse 23:44', function(done) {
+		var result = moment(new Date()).tz(TIMEZONE)
+	
+		result.hours(Number(23))
+		result.minutes(Number(44))
+		result.seconds(Number(0))
+		result.milliseconds(Number(0))
+			
+		var time = utilities.parseTime('23:44')
+		if ( time.toDate().getTime() == result.toDate().getTime() ) { 
+			done()
+		} else {
+			logging.error('target time: ' + result + '   parsed time: ' + time)
+			done('failed to parse')
+		}
+	})
+	it('Sunset offsets', function(done) {
+		var sunset = utilities.parseTime('sunset').add(30, 'minutes')
+			
+		var offset = utilities.parseTime('sunset+30')
+		if ( sunset.toDate().getTime() == offset.toDate().getTime() ) { 
+			done()
+		} else {
+			logging.error('target time: ' + sunset + '   parsed time: ' + offset)
+			done('failed to parse')
+		}
+	})
+})
+
+describe('rule tests', function() {
 	before(function() {
 		// runs before all tests in this block
 		global.clearQueues()
@@ -226,5 +295,4 @@ describe('quick trigger tests', function() {
 	documents.forEach(doc => {
 		processRuleFile(doc)
 	})
-
 })
