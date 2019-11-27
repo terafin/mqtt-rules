@@ -682,12 +682,9 @@ const getDevicesToWatchForRule = function(rule) {
 	if (!_.isNil(watch)) {
 		var associatedDevices = []
 
-		const devices = watch.devices
-		if (!_.isNil(devices)) {
-			devices.forEach(function(device) {
-				associatedDevices.push(device)
-			})
-		}
+		watch.forEach(function(device) {
+			associatedDevices.push(device)
+		})
 
 		return associatedDevices
 	}
@@ -729,13 +726,11 @@ const getAssociatedDevicesFromRule = function(rule) {
 	}
 
 	const watch = rule.watch
+	
 	if (!_.isNil(watch)) {
-		const devices = watch.devices
-		if (!_.isNil(devices)) {
-			devices.forEach(function(device) {
-				associatedDevices.push(device)
-			})
-		}
+		watch.forEach(function(device) {
+			associatedDevices.push(device)
+		})
 	}
 
 	const expression = rule.when
