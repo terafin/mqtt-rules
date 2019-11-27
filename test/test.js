@@ -1,6 +1,7 @@
 const utilities = require('../lib/utilities.js')
 const rules = require('../lib/loading.js')
 const moment = require('moment-timezone')
+const evaluate = require('mathjs').evaluate
 
 const TIMEZONE = utilities.getCurrentTimeZone()
 const _ = require('lodash')
@@ -149,9 +150,16 @@ const testProcessor = function(rule, rule_name, test, test_name) {
 
 			if (!_.isNil(context)) {
 				Object.keys(context).forEach(topic => {
-					variables.update(topic, context[topic])
+					var value = context[topic]
+					if ( utilities.isValueAnExpression(value) ) {
+						const string = utilities.prepareExpression(value, null)
+						const result = evaluate(string)
+						variables.update(topic, result)
+					} else {
+						variables.update(topic, value)
+					}			
 				})
-			}
+			} 
 
 			global.clearRuleMapCache()
 
