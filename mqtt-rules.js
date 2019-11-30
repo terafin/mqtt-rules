@@ -195,6 +195,7 @@ const setupMQTT = function() {
 	}
 }
 
+var timeLastRun = {}
 var ruleHistory = []
 var quietRuleHistory = []
 
@@ -204,6 +205,7 @@ const QUIET_RULES_TO_REMEMBER = 4000
 const resetRuleHistory = function() {
 	ruleHistory = []
 	quietRuleHistory = []
+	timeLastRun = {}
 }
 
 const addRuleToHistory = function(rule_name, expression, valueOrExpression, topic, message, inOptions, evaluate_job_data) {
@@ -239,35 +241,18 @@ const addRuleToHistory = function(rule_name, expression, valueOrExpression, topi
 		ruleHistory.unshift(data)
 		ruleHistory = ruleHistory.slice(0, RULES_TO_REMEMBER)
 	}
+
+	timeLastRun[rule_name] = data.date
 }
 
 const timeLastRuleRun = function(rule_name) {
-	var foundDate = null
+	const result = timeLastRun[rule_name]
 
-	const checkData = function(data) {
-		if (foundDate) {
-			return
-		}
-
-		const this_name = data.rule_name
-		if (rule_name == this_name) {
-			foundDate = data.date
-		}
+	if ( _.isNil(result) ) { 
+		return 0 
 	}
-
-	ruleHistory.forEach(data => {
-		checkData(data)
-	})
-
-	quietRuleHistory.forEach(data => {
-		checkData(data)
-	})
-
-	if (!_.isNil(foundDate)) {
-		return foundDate
-	}
-
-	return 0
+	
+	return result
 }
 
 const printRuleHistory = function() {
@@ -302,6 +287,7 @@ const printRuleHistory = function() {
 global.getRuleHistory = function() {
 	return ruleHistory
 }
+
 global.timeLastRuleRun = timeLastRuleRun
 global.printRuleHistory = printRuleHistory
 
