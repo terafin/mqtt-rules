@@ -571,12 +571,23 @@ global.changeProcessor = function(overrideRules, context, topic, message) {
 			callback()
 			return
 		}
-		const skipFirstRun = _.isNil(rule.skip_first_run) ? false : rule.skip_first_run
 
-		if (firstRun && skipFirstRun) {
-			logging.debug(' * skipping rule, due to first run skip: ' + rule_name)
+		const skip_startup = _.isNil(rule.skip_startup) ? false : rule.skip_startup
+
+		if (skip_startup && utilities.hasRecentlyStarted()) {
+			logging.debug(' * skipping rule, due to startup skip: ' + rule_name)
 			callback()
 			return
+		}
+
+		if ( firstRun ) {
+			const skipFirstRun = _.isNil(rule.skip_first_run) ? false : rule.skip_first_run
+
+			if (skipFirstRun) {
+				logging.debug(' * skipping rule, due to first run skip: ' + rule_name)
+				callback()
+				return
+			}
 		}
 
 		const disabled = rule.disabled
@@ -726,7 +737,7 @@ const getAssociatedDevicesFromRule = function(rule) {
 	}
 
 	const watch = rule.watch
-	
+
 	if (!_.isNil(watch)) {
 		watch.forEach(function(device) {
 			associatedDevices.push(device)
