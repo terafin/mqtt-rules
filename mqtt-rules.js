@@ -26,18 +26,6 @@ const moment = require('moment-timezone')
 const config_path = process.env.RULE_PATH
 const connectionProcessorDelay = 10
 
-var is_test_mode = process.env.TEST_MODE
-
-if (is_test_mode == 'true') {
-	is_test_mode = true
-} else if (is_test_mode != true) {
-	is_test_mode = false
-}
-
-
-global.isTestMode = function() {
-	return is_test_mode
-}
 const startCollectingMQTTChanges = function() {
 	if (_.isNil(collectedMQTTTChanges)) {
 		collectedMQTTTChanges = {}
@@ -57,7 +45,7 @@ const stopCollectingMQTTChanges = function() {
 }
 
 const handleMQTTConnection = function() {
-	if (is_test_mode === false) {
+	if (utilities.testMode() === false) {
 		global.client.on('message', (topic, message) => {
 			if (isCollectingMQTTChanges()) {
 				logging.debug(' * pending processing update for: ' + topic + '  => (handling in bulk)')
@@ -167,7 +155,7 @@ const handleConnectionEvent = function() {
 
 const handleSubscriptions = function() {
 
-	if (is_test_mode === false) {
+	if (utilities.testMode() === false) {
 		if (_.isNil(global.client) || !global.client.connected) {
 			return
 		}
@@ -186,7 +174,7 @@ const setupMQTT = function() {
 		return
 	}
 
-	if (is_test_mode === false) {
+	if (utilities.testMode() === false) {
 		global.client = mqtt_helpers.setupClient(function() {
 			handleMQTTConnection()
 		}, function() {
@@ -310,7 +298,7 @@ global.publish = function(rule_name, expression, valueOrExpression, topic, messa
 		})
 	}
 
-	if (!quiet && !global.isTestMode()) {
+	if (!quiet && !utilities.testMode()) {
 		logging.info('=> rule: ' + rule_name + '  publishing: ' + topic + ':' + message + ' (expression: ' + expression + ' | value: ' + valueOrExpression + ')' + '  options: ' + JSON.stringify(options))
 	}
 
@@ -716,7 +704,7 @@ const getAssociatedDevicesFromRule = function(rule) {
 
 	var associatedDevices = []
 
-	if (is_test_mode == false) {
+	if (utilities.testMode() == false) {
 		const testRuleOnly = rule.test_only
 
 		if (!_.isNil(testRuleOnly) && testRuleOnly == true) { 
@@ -866,7 +854,7 @@ const getAssociatedDevicesFromRule = function(rule) {
 }
 
 rule_loader.on('rules-loaded', () => {
-	if (is_test_mode == true) {
+	if (utilities.testMode() == true) {
 		logging.debug('test mode, not loading rules')
 		return
 	}
@@ -930,7 +918,7 @@ global.clearQueues = function() {
 	evaluation.clearQueues()
 }
 
-if (is_test_mode == false) {
+if (utilities.testMode() == false) {
 	logging.debug('loading rules')
 	rule_loader.load_path(config_path)
 } else {
