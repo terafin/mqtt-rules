@@ -187,7 +187,7 @@ var timeLastRun = {}
 var ruleHistory = []
 var quietRuleHistory = []
 
-const RULES_TO_REMEMBER = 1000
+const RULES_TO_REMEMBER = 2000
 const QUIET_RULES_TO_REMEMBER = 4000
 
 const resetRuleHistory = function() {
@@ -196,7 +196,7 @@ const resetRuleHistory = function() {
 	timeLastRun = {}
 }
 
-const addRuleToHistory = function(rule_name, expression, valueOrExpression, topic, message, inOptions, evaluate_job_data) {
+global.addRuleToHistory = function(rule_name, expression, valueOrExpression, topic, message, inOptions, evaluate_job_data, result) {
 	if (_.isNil(rule_name)) {
 		return
 	}
@@ -216,7 +216,7 @@ const addRuleToHistory = function(rule_name, expression, valueOrExpression, topi
 		evaluate_job_data: evaluate_job_data,
 		expression: expression,
 		valueOrExpression: valueOrExpression,
-		result: true,
+		result: result,
 		topic: topic,
 		message: message,
 		options: inOptions
@@ -326,7 +326,7 @@ global.publish = function(rule_name, expression, valueOrExpression, topic, messa
 				global.client.publish(queued_topic, queued_message, queued_options) 
 			}
 
-			addRuleToHistory(rule_name, expression, valueOrExpression, queued_topic, queued_message, queued_options, evaluate_job_data)
+			global.addRuleToHistory(rule_name, expression, valueOrExpression, queued_topic, queued_message, queued_options, evaluate_job_data, true)
 
 			if (!_.isNil(doneEvaluate)) {
 				doneEvaluate()
