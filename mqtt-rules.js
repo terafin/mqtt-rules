@@ -191,8 +191,6 @@ const RULES_TO_REMEMBER = 2000
 const QUIET_RULES_TO_REMEMBER = 4000
 
 const resetRuleHistory = function() {
-	ruleHistory = []
-	quietRuleHistory = []
 	timeLastRun = {}
 }
 
@@ -236,8 +234,8 @@ global.addRuleToHistory = function(rule_name, expression, valueOrExpression, top
 const timeLastRuleRun = function(rule_name) {
 	const result = timeLastRun[rule_name]
 
-	if ( _.isNil(result) ) { 
-		return 0 
+	if (_.isNil(result)) {
+		return 0
 	}
 
 	return result
@@ -322,8 +320,8 @@ global.publish = function(rule_name, expression, valueOrExpression, topic, messa
 				logging.info(' => MQTT publish: ' + queued_topic + '  message: ' + queued_message)
 			}
 
-			if ( !utilities.dontPublish() ) { 
-				global.client.publish(queued_topic, queued_message, queued_options) 
+			if (!utilities.dontPublish()) {
+				global.client.publish(queued_topic, queued_message, queued_options)
 			}
 
 			global.addRuleToHistory(rule_name, expression, valueOrExpression, queued_topic, queued_message, queued_options, evaluate_job_data, true)
@@ -556,7 +554,7 @@ global.changeProcessor = function(overrideRules, context, topic, message) {
 			return
 		}
 
-		if ( firstRun ) {
+		if (firstRun) {
 			const skipFirstRun = _.isNil(rule.skip_first_run) ? false : rule.skip_first_run
 
 			if (skipFirstRun) {
@@ -707,7 +705,7 @@ const getAssociatedDevicesFromRule = function(rule) {
 	if (utilities.testMode() == false) {
 		const testRuleOnly = rule.test_only
 
-		if (!_.isNil(testRuleOnly) && testRuleOnly == true) { 
+		if (!_.isNil(testRuleOnly) && testRuleOnly == true) {
 			return []
 		}
 	}
