@@ -28,7 +28,7 @@
         "redis": "^2.8.0",
         "request": "^2.88.0",
         "rimraf": "^2.6.3",
-        "simple-git": "^1.123.0",
+        "simple-git": "^1.131.0",
         "suncalc": "^1.8.0",
         "watch": "^1.0.2"
     },
