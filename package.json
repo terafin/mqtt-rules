@@ -23,7 +23,7 @@
         "mqtt": "^2.18.8",
         "mqtt-wildcard": "^3.0.9",
         "node-schedule-tz": "^1.2.1-4",
-        "pushover-notifications": "^1.2.0",
+        "pushover-notifications": "^1.2.2",
         "read-directory": "^3.0.1",
         "redis": "^2.8.0",
         "request": "^2.88.0",
