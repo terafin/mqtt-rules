@@ -13,7 +13,7 @@
     },
     "dependencies": {
         "async": "^2.6.2",
-        "express": "^4.16.4",
+        "express": "^4.17.1",
         "feels": "^3.0.0",
         "homeautomation-js-lib": "https://github.com/terafin/homeautomation-js-lib.git",
         "jexl": "^2.1.1",
