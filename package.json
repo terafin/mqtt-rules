@@ -24,7 +24,7 @@
         "mqtt-wildcard": "^3.0.9",
         "node-schedule-tz": "^1.2.1-4",
         "pushover-notifications": "^1.2.0",
-        "read-directory": "^3.0.1",
+        "read-directory": "^3.0.2",
         "redis": "^2.8.0",
         "request": "^2.88.0",
         "rimraf": "^2.6.3",
