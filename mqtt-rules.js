@@ -154,7 +154,6 @@ const handleConnectionEvent = function() {
 }
 
 const handleSubscriptions = function() {
-
     if (utilities.testMode() === false) {
         if (_.isNil(global.client) || !global.client.connected) {
             return
@@ -579,7 +578,6 @@ global.changeProcessor = function(overrideRules, context, topic, message) {
                 topic: topic,
                 message: utilities.convertToNumberIfNeeded(message),
                 rule: rule
-                    // context: context
             })
         }
 
