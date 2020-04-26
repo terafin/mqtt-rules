@@ -1,11 +1,10 @@
 FROM node:6-alpine
 
+RUN apk add --no-cache git tzdata
 
 RUN mkdir -p /usr/node_app
 COPY . /usr/node_app
 WORKDIR /usr/node_app
-RUN apk add --no-cache git
-RUN apk add --no-cache tzdata
 
 RUN npm install --production
 
