@@ -1,4 +1,5 @@
 // Requirements
+// eslint-disable-next-line no-unused-vars
 const mqtt = require('mqtt')
 const async = require('async')
 const _ = require('lodash')
