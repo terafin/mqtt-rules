@@ -27,6 +27,7 @@
         "read-directory": "^3.0.2",
         "redis": "^3.0.2",
         "rimraf": "latest",
+        "request": "latest",
         "got": "latest",
         "simple-git": "^1.132.0",
         "suncalc": "^1.8.0",
