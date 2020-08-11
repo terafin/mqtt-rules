@@ -26,8 +26,8 @@
         "pushover-notifications": "^1.2.2",
         "read-directory": "^3.0.2",
         "redis": "^3.0.2",
-        "request": "^2.88.2",
-        "rimraf": "^3.0.2",
+        "rimraf": "latest",
+        "got": "latest",
         "simple-git": "^1.132.0",
         "suncalc": "^1.8.0",
         "watch": "^1.0.2"
