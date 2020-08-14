@@ -18,7 +18,7 @@
         "homeautomation-js-lib": "https://github.com/terafin/homeautomation-js-lib.git",
         "jexl": "^2.2.2",
         "js-yaml": "^3.14.0",
-        "lodash": "^4.17.19",
+        "lodash": "^4.17.20",
         "moment-timezone": "^0.5.31",
         "mqtt": "^4.2.0",
         "mqtt-wildcard": "^3.0.9",
