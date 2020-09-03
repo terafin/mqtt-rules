@@ -9,9 +9,6 @@ const mqtt_helpers = require('homeautomation-js-lib/mqtt_helpers.js')
 const logging = require('homeautomation-js-lib/logging.js')
 const health = require('homeautomation-js-lib/health.js')
 
-require('homeautomation-js-lib/devices.js')
-require('homeautomation-js-lib/redis_helpers.js')
-
 var collectedMQTTTChanges = null
 
 const rule_loader = require('./lib/loading.js')
