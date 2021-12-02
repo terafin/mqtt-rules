@@ -42,9 +42,36 @@ const stopCollectingMQTTChanges = function() {
     collectedMQTTTChanges = null
 }
 
+
+const fixupTopic = function(inTopic) {
+    return inTopic
+}
+
+const fixupMessage = function(inMessage) {
+    var message = inMessage
+    
+    // Fix these dumb true/false/on/off things
+    if ( message == 'true' )
+        message = '1'
+    else if ( message == 'false' )
+        message = '0'
+    else if ( message == 'on' )
+        message = '1'
+    else if ( message == 'off' )
+        message = '0'
+
+    if ( message != inMessage ) 
+        logging.debug('changed message ' + inMessage + ' to ' + message)
+
+    return message
+}
+
 const handleMQTTConnection = function() {
     if (utilities.testMode() === false) {
-        global.client.on('message', (topic, message) => {
+        global.client.on('message', (inTopic, inMessage) => {
+            const topic = fixupTopic(inTopic)
+            const message = fixupMessage(inMessage)
+
             if (isCollectingMQTTChanges()) {
                 logging.debug(' * pending processing update for: ' + topic + '  => (handling in bulk)')
                 collectChange(topic, message)
@@ -689,7 +716,7 @@ const getDevicesFromString = function(string) {
         return null
     }
 
-    return string.match(/\/([a-z,0-9,\-,_,/])*/g)
+    return string.match(/\/([a-z,A-Z,0-9,\-,_,/])*/g)
 }
 const getAssociatedDevicesFromRule = function(rule) {
     if (_.isNil(rule)) {
