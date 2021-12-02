@@ -689,7 +689,7 @@ const getDevicesFromString = function(string) {
         return null
     }
 
-    return string.match(/\/([a-z,0-9,\-,_,/])*/g)
+    return string.match(/\/([a-z,A-Z,0-9,\-,_,/])*/g)
 }
 const getAssociatedDevicesFromRule = function(rule) {
     if (_.isNil(rule)) {
