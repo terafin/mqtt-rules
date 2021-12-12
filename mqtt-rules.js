@@ -55,10 +55,6 @@ const fixupMessage = function(inMessage) {
         message = '1'
     else if ( message == 'false' )
         message = '0'
-    else if ( message == 'on' )
-        message = '1'
-    else if ( message == 'off' )
-        message = '0'
 
     if ( message != inMessage ) 
         logging.debug('changed message ' + inMessage + ' to ' + message)
