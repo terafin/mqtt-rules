@@ -17,7 +17,7 @@
         "feels": "^3.0.0",
         "homeautomation-js-lib": "https://github.com/terafin/homeautomation-js-lib.git",
         "jexl": "^2.3.0",
-        "js-yaml": "^3.14.0",
+        "js-yaml": "^4.1.0",
         "lodash": "^4.17.19",
         "moment-timezone": "^0.5.33",
         "mqtt": "^4.2.6",
