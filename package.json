@@ -12,7 +12,7 @@
         "test": "mocha"
     },
     "dependencies": {
-        "async": "^3.2.0",
+        "async": "^3.2.3",
         "express": "^4.17.1",
         "feels": "^3.0.0",
         "homeautomation-js-lib": "https://github.com/terafin/homeautomation-js-lib.git",
