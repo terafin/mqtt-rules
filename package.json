@@ -25,7 +25,7 @@
         "node-schedule-tz": "^1.2.1-4",
         "pushover-notifications": "^1.2.2",
         "read-directory": "^3.0.2",
-        "redis": "^3.0.2",
+        "redis": "^4.0.4",
         "rimraf": "latest",
         "got": "latest",
         "simple-git": "^1.132.0",
