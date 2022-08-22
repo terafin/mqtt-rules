@@ -28,7 +28,7 @@
         "redis": "^3.0.2",
         "rimraf": "latest",
         "got": "latest",
-        "simple-git": "^1.132.0",
+        "simple-git": "^3.13.0",
         "suncalc": "^1.8.0",
         "chokidar": "latest"
     },
