@@ -19,7 +19,7 @@
         "jexl": "^2.3.0",
         "js-yaml": "^3.14.0",
         "lodash": "^4.17.19",
-        "moment-timezone": "^0.5.33",
+        "moment-timezone": "^0.5.35",
         "mqtt": "^4.2.6",
         "mqtt-wildcard": "^3.0.9",
         "node-schedule-tz": "^1.2.1-4",
