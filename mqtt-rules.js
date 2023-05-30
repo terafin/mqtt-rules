@@ -140,22 +140,23 @@ const connectionProcessor = function() {
 
     // need to capture everything that comes in, and process it as such
     const changedTopics = Object.keys(collectedMQTTTChanges)
+    
+    if ( !_.isNil(changedTopics) ) {
+        changedTopics.forEach(topic => {
+            const message = collectedMQTTTChanges[topic]
 
-    changedTopics.forEach(topic => {
-        const message = collectedMQTTTChanges[topic]
-
-        global.generateContext(topic, message, function(outTopic, outMessage, context) {
-            if (_.isNil(outTopic) || _.isNil(outMessage)) {
-                logging.error(' *** NOT Processing rules for: ' + topic)
-                logging.error('                     outTopic: ' + outTopic)
-                logging.error('                   outMessage: ' + outMessage)
-            } else {
-                context['firstRun'] = true
-                global.changeProcessor(null, context, outTopic, outMessage)
-            }
+            global.generateContext(topic, message, function(outTopic, outMessage, context) {
+                if (_.isNil(outTopic) || _.isNil(outMessage)) {
+                    logging.error(' *** NOT Processing rules for: ' + topic)
+                    logging.error('                     outTopic: ' + outTopic)
+                    logging.error('                   outMessage: ' + outMessage)
+                } else {
+                    context['firstRun'] = true
+                    global.changeProcessor(null, context, outTopic, outMessage)
+                }
+            })
         })
-    })
-
+    }
     stopCollectingMQTTChanges()
     logging.info(' => Done!')
 }
