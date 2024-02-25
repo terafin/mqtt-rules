@@ -24,45 +24,45 @@ const moment = require('moment-timezone')
 const config_path = process.env.RULE_PATH
 const connectionProcessorDelay = 10
 
-const startCollectingMQTTChanges = function() {
+const startCollectingMQTTChanges = function () {
     if (_.isNil(collectedMQTTTChanges)) {
         collectedMQTTTChanges = {}
     }
 }
 
-const isCollectingMQTTChanges = function() {
+const isCollectingMQTTChanges = function () {
     return !_.isNil(collectedMQTTTChanges)
 }
 
-const collectChange = function(topic, message) {
+const collectChange = function (topic, message) {
     collectedMQTTTChanges[topic] = message
 }
 
-const stopCollectingMQTTChanges = function() {
+const stopCollectingMQTTChanges = function () {
     collectedMQTTTChanges = null
 }
 
 
-const fixupTopic = function(inTopic) {
+const fixupTopic = function (inTopic) {
     return inTopic
 }
 
-const fixupMessage = function(inMessage) {
+const fixupMessage = function (inMessage) {
     var message = inMessage
-    
+
     // Fix these dumb true/false/on/off things
-    if ( message == 'true' )
+    if (message == 'true')
         message = '1'
-    else if ( message == 'false' )
+    else if (message == 'false')
         message = '0'
 
-    if ( message != inMessage ) 
+    if (message != inMessage)
         logging.debug('changed message ' + inMessage + ' to ' + message)
 
     return message
 }
 
-const handleMQTTConnection = function() {
+const handleMQTTConnection = function () {
     if (utilities.testMode() === false) {
         global.client.on('message', (inTopic, inMessage) => {
             const topic = fixupTopic(inTopic)
@@ -99,12 +99,12 @@ const handleMQTTConnection = function() {
                 incoming_topic: topic,
                 incoming_message: message
             }
-            queue.enqueue('mqtt-incoming', topic, function(job, doneEvaluate) {
+            queue.enqueue('mqtt-incoming', topic, function (job, doneEvaluate) {
                 const queued_topic = job.data.incoming_topic
                 const queued_message = job.data.incoming_message
                 logging.debug('handling queued incoming topic message: ' + queued_topic + ' message: ' + queued_message)
 
-                global.generateContext(queued_topic, queued_message, function(outTopic, outMessage, context) {
+                global.generateContext(queued_topic, queued_message, function (outTopic, outMessage, context) {
                     global.changeProcessor(null, context, queued_topic, queued_message)
                 })
 
@@ -125,7 +125,7 @@ const handleMQTTConnection = function() {
     handleConnectionEvent()
 }
 
-const disconnectionEvent = function() {
+const disconnectionEvent = function () {
     if (!_.isNil(global.client) && global.client.connected) {
         return
     }
@@ -135,18 +135,18 @@ const disconnectionEvent = function() {
     startCollectingMQTTChanges()
 }
 
-const connectionProcessor = function() {
+const connectionProcessor = function () {
     logging.info(' * Processing bulk connection setup start')
 
-    if ( !_.isNil(collectedMQTTTChanges) ) {
+    if (!_.isNil(collectedMQTTTChanges)) {
         // need to capture everything that comes in, and process it as such
         const changedTopics = Object.keys(collectedMQTTTChanges)
-        
-        if ( !_.isNil(changedTopics) ) {
+
+        if (!_.isNil(changedTopics)) {
             changedTopics.forEach(topic => {
                 const message = collectedMQTTTChanges[topic]
 
-                global.generateContext(topic, message, function(outTopic, outMessage, context) {
+                global.generateContext(topic, message, function (outTopic, outMessage, context) {
                     if (_.isNil(outTopic) || _.isNil(outMessage)) {
                         logging.error(' *** NOT Processing rules for: ' + topic)
                         logging.error('                     outTopic: ' + outTopic)
@@ -163,7 +163,7 @@ const connectionProcessor = function() {
     logging.info(' => Done!')
 }
 
-const handleConnectionEvent = function() {
+const handleConnectionEvent = function () {
     if (_.isNil(global.client) || !global.client.connected) {
         return
     }
@@ -177,7 +177,7 @@ const handleConnectionEvent = function() {
     setTimeout(connectionProcessor, (connectionProcessorDelay * 1000))
 }
 
-const handleSubscriptions = function() {
+const handleSubscriptions = function () {
     if (utilities.testMode() === false) {
         if (_.isNil(global.client) || !global.client.connected) {
             return
@@ -192,15 +192,15 @@ const handleSubscriptions = function() {
     }
 }
 
-const setupMQTT = function() {
+const setupMQTT = function () {
     if (!_.isNil(global.client)) {
         return
     }
 
     if (utilities.testMode() === false) {
-        global.client = mqtt_helpers.setupClient(function() {
+        global.client = mqtt_helpers.setupClient(function () {
             handleMQTTConnection()
-        }, function() {
+        }, function () {
             disconnectionEvent()
         })
     }
@@ -213,11 +213,11 @@ var quietRuleHistory = []
 const RULES_TO_REMEMBER = 2000
 const QUIET_RULES_TO_REMEMBER = 4000
 
-const resetRuleHistory = function() {
+const resetRuleHistory = function () {
     timeLastRun = {}
 }
 
-global.addRuleToHistory = function(rule_name, expression, valueOrExpression, topic, message, inOptions, evaluate_job_data, result) {
+global.addRuleToHistory = function (rule_name, expression, valueOrExpression, topic, message, inOptions, evaluate_job_data, result) {
     if (_.isNil(rule_name)) {
         return
     }
@@ -254,7 +254,7 @@ global.addRuleToHistory = function(rule_name, expression, valueOrExpression, top
     timeLastRun[rule_name] = data.date
 }
 
-const timeLastRuleRun = function(rule_name) {
+const timeLastRuleRun = function (rule_name) {
     const result = timeLastRun[rule_name]
 
     if (_.isNil(result)) {
@@ -264,11 +264,11 @@ const timeLastRuleRun = function(rule_name) {
     return result
 }
 
-const printRuleHistory = function() {
+const printRuleHistory = function () {
     logging.info('=== Rules Log ===')
     logging.info('')
 
-    const printRule = function(data) {
+    const printRule = function (data) {
         const rule_name = data.rule_name
         const date = data.date
         const topic = data.topic
@@ -293,7 +293,7 @@ const printRuleHistory = function() {
     logging.info('=================')
 }
 
-global.getRuleHistory = function() {
+global.getRuleHistory = function () {
     return ruleHistory
 }
 
@@ -302,7 +302,7 @@ global.printRuleHistory = printRuleHistory
 
 global.publishEvents = []
 
-global.publish = function(rule_name, expression, valueOrExpression, topic, message, inOptions, evaluate_job_data) {
+global.publish = function (rule_name, expression, valueOrExpression, topic, message, inOptions, evaluate_job_data) {
     var options = {
         retain: false,
         qos: 1
@@ -314,7 +314,7 @@ global.publish = function(rule_name, expression, valueOrExpression, topic, messa
             quiet = inOptions.quiet
         }
 
-        Object.keys(inOptions).forEach(function(key) {
+        Object.keys(inOptions).forEach(function (key) {
             options[key] = inOptions[key]
         })
     }
@@ -333,7 +333,7 @@ global.publish = function(rule_name, expression, valueOrExpression, topic, messa
         }
         logging.debug(' queue publish : ' + topic + '  message: ' + message + '  data: ' + JSON.stringify(data))
 
-        queue.enqueue('mqtt-publish', topic, function(job, doneEvaluate) {
+        queue.enqueue('mqtt-publish', topic, function (job, doneEvaluate) {
             const queued_topic = job.data.outgoing_topic
             const queued_message = job.data.outgoing_message
             const queued_options = job.data.outgoing_options
@@ -358,17 +358,17 @@ global.publish = function(rule_name, expression, valueOrExpression, topic, messa
 
 global.devices_to_monitor = []
 
-global.clearRuleMapCache = function() {
+global.clearRuleMapCache = function () {
     clearRuleMapCache()
 }
 
 var ruleMapCache = {}
 
-const clearRuleMapCache = function() {
+const clearRuleMapCache = function () {
     ruleMapCache = {}
 }
 
-const cachedRulesForTopic = function(topic) {
+const cachedRulesForTopic = function (topic) {
     if (_.isNil(topic)) {
         return null
     }
@@ -398,7 +398,7 @@ const cachedRulesForTopic = function(topic) {
     return cachedRulesForTopic(foundMatch)
 }
 
-const isRuleQuiet = function(rule) {
+const isRuleQuiet = function (rule) {
     var quiet = false
 
     if (!_.isNil(rule) && !_.isNil(rule.options)) {
@@ -408,7 +408,7 @@ const isRuleQuiet = function(rule) {
     return quiet
 }
 
-const isAnyRuleQuiet = function(rules) {
+const isAnyRuleQuiet = function (rules) {
     var quiet = false
 
     rules.forEach(rule => {
@@ -418,7 +418,7 @@ const isAnyRuleQuiet = function(rules) {
     return quiet
 }
 
-const cacheRulesForTopic = function(topic, rules) {
+const cacheRulesForTopic = function (topic, rules) {
     if (_.isNil(topic)) {
         return null
     }
@@ -426,7 +426,7 @@ const cacheRulesForTopic = function(topic, rules) {
     ruleMapCache[topic] = rules
 }
 
-const getRulesArray = function(allRuleSets) {
+const getRulesArray = function (allRuleSets) {
     if (_.isNil(allRuleSets)) {
         logging.error('empty rules')
         return null
@@ -459,7 +459,7 @@ const getRulesArray = function(allRuleSets) {
     return foundRules
 }
 
-const getRulesTriggeredBy = function(allRuleSets, topic) {
+const getRulesTriggeredBy = function (allRuleSets, topic) {
 
     if (_.isNil(allRuleSets)) {
         logging.error('empty rules')
@@ -521,7 +521,7 @@ const getRulesTriggeredBy = function(allRuleSets, topic) {
     return foundRules
 }
 
-global.changeProcessor = function(overrideRules, context, topic, message) {
+global.changeProcessor = function (overrideRules, context, topic, message) {
     const ruleStartTime = new Date().getTime()
     var allRuleSets = overrideRules
 
@@ -557,7 +557,7 @@ global.changeProcessor = function(overrideRules, context, topic, message) {
     context[utilities.update_topic_for_expression(topic)] = message
 
     const firstRun = context['firstRun']
-    var ruleProcessor = function(rule, rule_name, callback) {
+    var ruleProcessor = function (rule, rule_name, callback) {
         if (!quiet) {
             logging.debug('processing rule: ' + rule_name)
             logging.debug('    rule config: ' + JSON.stringify(rule))
@@ -627,7 +627,7 @@ global.changeProcessor = function(overrideRules, context, topic, message) {
 }
 
 
-global.generateContext = function(topic, inMessage, callback) {
+global.generateContext = function (topic, inMessage, callback) {
     if (_.isNil(callback)) {
         return
     }
@@ -665,7 +665,7 @@ global.generateContext = function(topic, inMessage, callback) {
         try {
             var jsonFound = JSON.parse(message)
             if (!_.isNil(jsonFound)) {
-                Object.keys(jsonFound).forEach(function(key) {
+                Object.keys(jsonFound).forEach(function (key) {
                     context[key] = jsonFound[key]
                 })
             }
@@ -679,7 +679,7 @@ global.generateContext = function(topic, inMessage, callback) {
     }
 }
 
-const getDevicesToWatchForRule = function(rule) {
+const getDevicesToWatchForRule = function (rule) {
     if (_.isNil(rule)) {
         return
     }
@@ -689,7 +689,7 @@ const getDevicesToWatchForRule = function(rule) {
     if (!_.isNil(watch)) {
         var associatedDevices = []
 
-        watch.forEach(function(device) {
+        watch.forEach(function (device) {
             associatedDevices.push(device)
         })
 
@@ -699,25 +699,25 @@ const getDevicesToWatchForRule = function(rule) {
     return getAssociatedDevicesFromRule(rule)
 }
 
-global.getAssociatedDevicesFromRule = function(rule) {
+global.getAssociatedDevicesFromRule = function (rule) {
     return getAssociatedDevicesFromRule(rule)
 }
 
-Array.prototype.unique = function() {
-    return this.filter(function(value, index, self) {
+Array.prototype.unique = function () {
+    return this.filter(function (value, index, self) {
         return self.indexOf(value) === index
     })
 }
 
 
-const getDevicesFromString = function(string) {
+const getDevicesFromString = function (string) {
     if (_.isNil(string)) {
         return null
     }
 
     return string.match(/\/([a-z,A-Z,0-9,\-,_,/])*/g)
 }
-const getAssociatedDevicesFromRule = function(rule) {
+const getAssociatedDevicesFromRule = function (rule) {
     if (_.isNil(rule)) {
         return []
     }
@@ -735,7 +735,7 @@ const getAssociatedDevicesFromRule = function(rule) {
     const watch = rule.watch
 
     if (!_.isNil(watch)) {
-        watch.forEach(function(device) {
+        watch.forEach(function (device) {
             associatedDevices.push(device)
         })
     }
@@ -749,7 +749,7 @@ const getAssociatedDevicesFromRule = function(rule) {
             var foundDevices = getDevicesFromString(expression)
 
             if (!_.isNil(foundDevices)) {
-                foundDevices.forEach(function(device) {
+                foundDevices.forEach(function (device) {
                     associatedDevices.push(device)
                 })
             }
@@ -758,7 +758,7 @@ const getAssociatedDevicesFromRule = function(rule) {
 
     const actions = rule.actions
     if (!_.isNil(actions)) {
-        Object.keys(actions).forEach(function(action) {
+        Object.keys(actions).forEach(function (action) {
             if (action == 'if') {
                 const subExpressions = actions.if
                 const subExpressionKeys = Object.keys(subExpressions)
@@ -766,7 +766,7 @@ const getAssociatedDevicesFromRule = function(rule) {
                 subExpressionKeys.forEach(key => {
                     const subExpression = subExpressions[key]
                     const subExpressionDevices = getAssociatedDevicesFromRule(subExpression)
-                    subExpressionDevices.forEach(function(device) {
+                    subExpressionDevices.forEach(function (device) {
                         associatedDevices.push(device)
                     })
 
@@ -778,7 +778,7 @@ const getAssociatedDevicesFromRule = function(rule) {
             var foundDevices = getDevicesFromString(action_value)
 
             if (!_.isNil(foundDevices)) {
-                foundDevices.forEach(function(device) {
+                foundDevices.forEach(function (device) {
                     associatedDevices.push(device)
                 })
             }
@@ -788,7 +788,7 @@ const getAssociatedDevicesFromRule = function(rule) {
     // Need to handle action key here....
     const otherwise = rule.otherwise
     if (!_.isNil(otherwise)) {
-        Object.keys(otherwise).forEach(function(action) {
+        Object.keys(otherwise).forEach(function (action) {
             if (action == 'if') {
                 const subExpressions = otherwise.if
                 const subExpressionKeys = Object.keys(subExpressions)
@@ -796,7 +796,7 @@ const getAssociatedDevicesFromRule = function(rule) {
                 subExpressionKeys.forEach(key => {
                     const subExpression = subExpressions[key]
                     const subExpressionDevices = getAssociatedDevicesFromRule(subExpression)
-                    subExpressionDevices.forEach(function(device) {
+                    subExpressionDevices.forEach(function (device) {
                         associatedDevices.push(device)
                     })
 
@@ -808,7 +808,7 @@ const getAssociatedDevicesFromRule = function(rule) {
             var foundDevices = getDevicesFromString(action_value)
 
             if (!_.isNil(foundDevices)) {
-                foundDevices.forEach(function(device) {
+                foundDevices.forEach(function (device) {
                     associatedDevices.push(device)
                 })
             }
@@ -817,41 +817,41 @@ const getAssociatedDevicesFromRule = function(rule) {
 
     const conditional_actions = !_.isNil(rule.actions) ? rule.actions.if : null
     if (!_.isNil(conditional_actions)) {
-        Object.keys(conditional_actions).forEach(function(conditional_action_name) {
+        Object.keys(conditional_actions).forEach(function (conditional_action_name) {
             const all_actions = conditional_actions[conditional_action_name].actions
 
-            Object.keys(all_actions).forEach(function(action_name) {
+            Object.keys(all_actions).forEach(function (action_name) {
                 const action_value = all_actions[action_name]
                 var foundDevices = getDevicesFromString(action_value)
 
                 if (!_.isNil(foundDevices)) {
-                    foundDevices.forEach(function(device) {
+                    foundDevices.forEach(function (device) {
                         associatedDevices.push(device)
                     })
                 }
             })
         })
     }
-    const processNotifyBlock = function(notify) {
+    const processNotifyBlock = function (notify) {
         if (!_.isNil(notify)) {
             const titleDevices = getDevicesFromString(notify.title)
             const messageDevices = getDevicesFromString(notify.message)
             const expressionDevices = getDevicesFromString(notify.when)
 
             if (!_.isNil(titleDevices)) {
-                titleDevices.forEach(function(device) {
+                titleDevices.forEach(function (device) {
                     associatedDevices.push(device)
                 })
             }
 
             if (!_.isNil(messageDevices)) {
-                messageDevices.forEach(function(device) {
+                messageDevices.forEach(function (device) {
                     associatedDevices.push(device)
                 })
             }
 
             if (!_.isNil(expressionDevices)) {
-                expressionDevices.forEach(function(device) {
+                expressionDevices.forEach(function (device) {
                     associatedDevices.push(device)
                 })
             }
@@ -886,7 +886,7 @@ rule_loader.on('rules-loaded', () => {
 
     var ruleCount = 0
 
-    rule_loader.ruleIterator(function(rule_name, rule) {
+    rule_loader.ruleIterator(function (rule_name, rule) {
         var triggerDevices = getDevicesToWatchForRule(rule)
 
         if (!_.isNil(triggerDevices)) {
@@ -924,7 +924,7 @@ rule_loader.on('rules-loaded', () => {
     logging.info('     Devices to monitor: ' + global.devices_to_monitor.length)
     logging.info('                  Rules: ' + ruleCount)
 
-    variables.updateObservedTopics(global.devices_to_monitor, function() {
+    variables.updateObservedTopics(global.devices_to_monitor, function () {
         setupMQTT()
         schedule.scheduleJobs()
         api.updateRules(rule_loader)
@@ -934,7 +934,7 @@ rule_loader.on('rules-loaded', () => {
     resetRuleHistory()
 })
 
-global.clearQueues = function() {
+global.clearQueues = function () {
     evaluation.clearQueues()
 }
 
